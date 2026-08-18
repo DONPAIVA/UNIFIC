@@ -47,7 +47,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
-import { formatarTelefone } from "@/lib/cpf";
+import { formatarCpf, formatarTelefone, mascararCpf } from "@/lib/cpf";
 
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -1356,13 +1356,7 @@ function PedidoDetalhe({ id, onBack }: { id: string; onBack: () => void }) {
         </Panel>
       )}
 
-      {data.faturamento && (
-        <Panel title="Dados de faturamento">
-          <pre className="max-h-56 overflow-auto rounded-lg bg-zinc-950 p-3 text-[11px] text-emerald-300">
-            {JSON.stringify(data.faturamento, null, 2)}
-          </pre>
-        </Panel>
-      )}
+      {data.faturamento && <DadosCompradorPanel faturamento={data.faturamento} />}
 
       <Panel title="Histórico de rastreamento">
         {data.events.length === 0 ? (
@@ -1715,6 +1709,89 @@ function SincronizacoesTab({ accountId }: { accountId: string | null }) {
           </Table>
           <Pager total={data.total} limit={limit} offset={offset} onChange={setOffset} />
         </>
+      )}
+    </Panel>
+  );
+}
+
+/* ========================================================================== */
+/* Dados do comprador (billing_info do pedido)                                */
+/* ========================================================================== */
+
+/**
+ * Mostra CPF, nome e endereço do comprador de forma legível.
+ *
+ * O Mercado Livre devolve isso em `additional_info`, um array de
+ * { type, value } — formato bom para máquina e péssimo para gente. Antes o
+ * painel jogava o JSON cru na tela; aqui os campos viram um cartão.
+ *
+ * O CPF nasce oculto e é revelado por clique. Dado pessoal em tela aberta é
+ * o tipo de coisa que aparece sem querer num print ou numa reunião — e a
+ * conferência com o cliente raramente precisa do número inteiro à vista.
+ */
+function DadosCompradorPanel({ faturamento }: { faturamento: any }) {
+  const [cpfVisivel, setCpfVisivel] = useState(false);
+  const [cru, setCru] = useState(false);
+
+  const info: Record<string, string> = {};
+  for (const item of faturamento?.additional_info ?? []) {
+    if (item?.type) info[String(item.type)] = String(item.value ?? "");
+  }
+
+  const doc = faturamento?.doc_number ?? info["DOC_NUMBER"] ?? "";
+  const tipoDoc = faturamento?.doc_type ?? info["DOC_TYPE"] ?? "Documento";
+  const nome = [info["FIRST_NAME"], info["LAST_NAME"]].filter(Boolean).join(" ");
+  const endereco = [
+    [info["STREET_NAME"], info["STREET_NUMBER"]].filter(Boolean).join(", "),
+    info["COMMENT"],
+    info["NEIGHBORHOOD"],
+    [info["CITY_NAME"], info["STATE_NAME"]].filter(Boolean).join(" / "),
+    info["ZIP_CODE"] ? `CEP ${info["ZIP_CODE"]}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <Panel
+      title="Dados do comprador"
+      right={
+        <button
+          onClick={() => setCru((v) => !v)}
+          className="rounded-lg bg-zinc-100 px-2 py-1 text-[11px] font-semibold text-zinc-600 hover:bg-zinc-200"
+        >
+          {cru ? "Ver organizado" : "Ver JSON"}
+        </button>
+      }
+    >
+      {cru ? (
+        <pre className="max-h-56 overflow-auto rounded-lg bg-zinc-950 p-3 text-[11px] text-emerald-300">
+          {JSON.stringify(faturamento, null, 2)}
+        </pre>
+      ) : (
+        <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+          <Field label="Nome" value={nome || "—"} />
+          <Field
+            label={tipoDoc}
+            value={
+              !doc ? (
+                "—"
+              ) : cpfVisivel ? (
+                <span className="font-mono">{formatarCpf(doc)}</span>
+              ) : (
+                <button
+                  onClick={() => setCpfVisivel(true)}
+                  className="font-mono text-zinc-500 underline decoration-dotted hover:text-zinc-900"
+                  title="Clique para revelar"
+                >
+                  {mascararCpf(doc)}
+                </button>
+              )
+            }
+          />
+          <div className="sm:col-span-2">
+            <Field label="Endereço de faturamento" value={endereco || "—"} />
+          </div>
+        </div>
       )}
     </Panel>
   );
