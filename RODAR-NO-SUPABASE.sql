@@ -1,9 +1,107 @@
 -- ============================================================================
 -- UNIFIC+ — migrations pendentes. Cole TUDO no SQL Editor do Supabase e Run.
--- Seguro rodar mais de uma vez (tudo e IF NOT EXISTS / DROP-CREATE).
--- Nenhuma tabela existente e alterada de forma destrutiva.
+-- Seguro rodar mais de uma vez. Nada e apagado.
+-- PARTE 1: destrava o pedido compartilhado entre comprador e vendedor (URGENTE)
+-- PARTE 2: tabelas das notificacoes do Mercado Livre
+-- PARTE 3: cadastro do cliente (nome, telefone, CPF, PIN)
 -- ============================================================================
--- PARTE 1 de 2 — NOTIFICACOES DO MERCADO LIVRE
+
+
+-- ============================================================================
+-- PARTE 1 — PEDIDO COMPARTILHADO (corrige o erro de chave duplicada)
+-- ============================================================================
+
+-- ============================================================================
+-- O MESMO PEDIDO PODE EXISTIR EM DUAS CONTAS (comprador e vendedor).
+-- Execute no SQL Editor do Supabase.
+-- ============================================================================
+--
+-- O SINTOMA
+--   Pedido 2000017986518784: valor de chave duplicado viola a restriÃ§Ã£o
+--   exclusiva "ml_orders_order_id_key"
+-- A sincronizaÃ§Ã£o inteira aborta e a conta fica com status ERRO.
+--
+-- A CAUSA
+-- `ml_orders` veio de um schema antigo em que o identificador era a coluna
+-- `order_id`, com UNIQUE GLOBAL. A migration 20260815100000 criou um gatilho
+-- que espelha ml_order_id -> order_id para manter esse legado coerente.
+--
+-- Efeito colateral: aquele UNIQUE passou a valer para a tabela toda, e nÃ£o por
+-- conta. Como um pedido do Mercado Livre tem SEMPRE duas pontas â€” o comprador
+-- e o vendedor â€” assim que as duas conectam o app, a segunda a sincronizar
+-- esbarra na linha da primeira.
+--
+-- NÃ£o Ã© caso raro: Ã© o funcionamento normal de um marketplace.
+--
+-- A CORREÃ‡ÃƒO
+-- Remover o UNIQUE global da coluna legada. A unicidade correta,
+-- UNIQUE (account_id, ml_order_id), jÃ¡ existe desde 20260813120000 e continua
+-- valendo â€” cada conta segue com no mÃ¡ximo uma linha por pedido.
+--
+-- Nenhuma coluna Ã© removida, nenhum dado Ã© apagado, o gatilho continua
+-- espelhando o valor para quem ainda consulta a coluna antiga.
+-- ============================================================================
+
+DO $$
+DECLARE
+  nome text;
+BEGIN
+  -- Constraints UNIQUE que cobrem SOMENTE a coluna order_id.
+  FOR nome IN
+    SELECT con.conname
+      FROM pg_constraint con
+      JOIN pg_class      rel ON rel.oid = con.conrelid
+      JOIN pg_namespace  ns  ON ns.oid  = rel.relnamespace
+     WHERE ns.nspname   = 'public'
+       AND rel.relname  = 'ml_orders'
+       AND con.contype  = 'u'
+       AND (
+         SELECT array_agg(att.attname::text)
+           FROM unnest(con.conkey) AS k(attnum)
+           JOIN pg_attribute att
+             ON att.attrelid = con.conrelid AND att.attnum = k.attnum
+       ) = ARRAY['order_id']
+  LOOP
+    EXECUTE format('ALTER TABLE public.ml_orders DROP CONSTRAINT %I', nome);
+    RAISE NOTICE 'Removida a restricao global %', nome;
+  END LOOP;
+
+  -- Ãndices Ãºnicos soltos sobre order_id (sem constraint por trÃ¡s).
+  FOR nome IN
+    SELECT i.relname
+      FROM pg_index     idx
+      JOIN pg_class     i   ON i.oid   = idx.indexrelid
+      JOIN pg_class     t   ON t.oid   = idx.indrelid
+      JOIN pg_namespace ns  ON ns.oid  = t.relnamespace
+     WHERE ns.nspname  = 'public'
+       AND t.relname   = 'ml_orders'
+       AND idx.indisunique
+       AND NOT idx.indisprimary
+       AND (
+         SELECT array_agg(att.attname::text)
+           FROM unnest(idx.indkey) AS k(attnum)
+           JOIN pg_attribute att
+             ON att.attrelid = idx.indrelid AND att.attnum = k.attnum
+       ) = ARRAY['order_id']
+  LOOP
+    EXECUTE format('DROP INDEX IF EXISTS public.%I', nome);
+    RAISE NOTICE 'Removido o indice unico global %', nome;
+  END LOOP;
+END $$;
+
+-- Garante a unicidade correta: uma linha por pedido POR CONTA.
+CREATE UNIQUE INDEX IF NOT EXISTS ml_orders_conta_pedido_uidx
+  ON public.ml_orders (account_id, ml_order_id);
+
+-- Consulta pela coluna legada continua rÃ¡pida, agora sem exigir unicidade.
+CREATE INDEX IF NOT EXISTS ml_orders_order_id_idx ON public.ml_orders (order_id);
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- ============================================================================
+-- PARTE 2 — NOTIFICACOES DO MERCADO LIVRE
+-- ============================================================================
 
 -- ============================================================================
 -- NOTIFICAÃ‡Ã•ES COMPLETAS â€” todos os tÃ³picos do Mercado Livre passam a ter
@@ -330,7 +428,7 @@ NOTIFY pgrst, 'reload schema';
 
 
 -- ============================================================================
--- PARTE 2 de 2 — PERFIL DO CLIENTE (nome, telefone, CPF, PIN)
+-- PARTE 3 — PERFIL DO CLIENTE
 -- ============================================================================
 
 -- ============================================================================
