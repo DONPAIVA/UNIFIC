@@ -1,0 +1,2 @@
+CREATE POLICY "ml_connections sem acesso publico" ON public.ml_connections FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+CREATE POLICY "ml_oauth_states sem acesso publico" ON public.ml_oauth_states FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);

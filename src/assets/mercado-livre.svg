@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Mercado Livre">
+  <rect x="0" y="0" width="48" height="48" rx="10" fill="#ffe600"/>
+  <g stroke="#2d3277" stroke-width="9" stroke-linecap="round" fill="none">
+    <path d="M5 33 L18 26"/>
+    <path d="M43 33 L30 26"/>
+  </g>
+  <rect x="15.5" y="19" width="17" height="12" rx="6" fill="#2d3277"/>
+  <g stroke="#ffe600" stroke-width="1.4" stroke-linecap="round" opacity="0.75">
+    <path d="M20 22.5 L20 27.5"/>
+    <path d="M24 22 L24 28"/>
+    <path d="M28 22.5 L28 27.5"/>
+  </g>
+</svg>
