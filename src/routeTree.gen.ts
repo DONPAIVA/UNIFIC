@@ -26,6 +26,7 @@ import { Route as ApiPublicMlAuthorizeRouteImport } from './routes/api/public/ml
 import { Route as ApiPublicMlCallbackRouteImport } from './routes/api/public/ml/callback'
 import { Route as ApiPublicMlConnectRouteImport } from './routes/api/public/ml/connect'
 import { Route as ApiPublicMlCronRouteImport } from './routes/api/public/ml/cron'
+import { Route as ApiPublicMlDiagnosticoRouteImport } from './routes/api/public/ml/diagnostico'
 import { Route as ApiPublicMlRefreshRouteImport } from './routes/api/public/ml/refresh'
 import { Route as ApiPublicMlStatusRouteImport } from './routes/api/public/ml/status'
 import { Route as ApiPublicMlWebhookRouteImport } from './routes/api/public/ml/webhook'
@@ -116,6 +117,11 @@ const ApiPublicMlCronRoute = ApiPublicMlCronRouteImport.update({
   path: '/api/public/ml/cron',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicMlDiagnosticoRoute = ApiPublicMlDiagnosticoRouteImport.update({
+  id: '/api/public/ml/diagnostico',
+  path: '/api/public/ml/diagnostico',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicMlRefreshRoute = ApiPublicMlRefreshRouteImport.update({
   id: '/api/public/ml/refresh',
   path: '/api/public/ml/refresh',
@@ -156,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/api/public/ml/callback': typeof ApiPublicMlCallbackRoute
   '/api/public/ml/connect': typeof ApiPublicMlConnectRoute
   '/api/public/ml/cron': typeof ApiPublicMlCronRoute
+  '/api/public/ml/diagnostico': typeof ApiPublicMlDiagnosticoRoute
   '/api/public/ml/refresh': typeof ApiPublicMlRefreshRoute
   '/api/public/ml/status': typeof ApiPublicMlStatusRoute
   '/api/public/ml/webhook': typeof ApiPublicMlWebhookRoute
@@ -179,6 +186,7 @@ export interface FileRoutesByTo {
   '/api/public/ml/callback': typeof ApiPublicMlCallbackRoute
   '/api/public/ml/connect': typeof ApiPublicMlConnectRoute
   '/api/public/ml/cron': typeof ApiPublicMlCronRoute
+  '/api/public/ml/diagnostico': typeof ApiPublicMlDiagnosticoRoute
   '/api/public/ml/refresh': typeof ApiPublicMlRefreshRoute
   '/api/public/ml/status': typeof ApiPublicMlStatusRoute
   '/api/public/ml/webhook': typeof ApiPublicMlWebhookRoute
@@ -203,6 +211,7 @@ export interface FileRoutesById {
   '/api/public/ml/callback': typeof ApiPublicMlCallbackRoute
   '/api/public/ml/connect': typeof ApiPublicMlConnectRoute
   '/api/public/ml/cron': typeof ApiPublicMlCronRoute
+  '/api/public/ml/diagnostico': typeof ApiPublicMlDiagnosticoRoute
   '/api/public/ml/refresh': typeof ApiPublicMlRefreshRoute
   '/api/public/ml/status': typeof ApiPublicMlStatusRoute
   '/api/public/ml/webhook': typeof ApiPublicMlWebhookRoute
@@ -228,6 +237,7 @@ export interface FileRouteTypes {
     | '/api/public/ml/callback'
     | '/api/public/ml/connect'
     | '/api/public/ml/cron'
+    | '/api/public/ml/diagnostico'
     | '/api/public/ml/refresh'
     | '/api/public/ml/status'
     | '/api/public/ml/webhook'
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/api/public/ml/callback'
     | '/api/public/ml/connect'
     | '/api/public/ml/cron'
+    | '/api/public/ml/diagnostico'
     | '/api/public/ml/refresh'
     | '/api/public/ml/status'
     | '/api/public/ml/webhook'
@@ -274,6 +285,7 @@ export interface FileRouteTypes {
     | '/api/public/ml/callback'
     | '/api/public/ml/connect'
     | '/api/public/ml/cron'
+    | '/api/public/ml/diagnostico'
     | '/api/public/ml/refresh'
     | '/api/public/ml/status'
     | '/api/public/ml/webhook'
@@ -298,6 +310,7 @@ export interface RootRouteChildren {
   ApiPublicMlCallbackRoute: typeof ApiPublicMlCallbackRoute
   ApiPublicMlConnectRoute: typeof ApiPublicMlConnectRoute
   ApiPublicMlCronRoute: typeof ApiPublicMlCronRoute
+  ApiPublicMlDiagnosticoRoute: typeof ApiPublicMlDiagnosticoRoute
   ApiPublicMlRefreshRoute: typeof ApiPublicMlRefreshRoute
   ApiPublicMlStatusRoute: typeof ApiPublicMlStatusRoute
   ApiPublicMlWebhookRoute: typeof ApiPublicMlWebhookRoute
@@ -425,6 +438,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMlCronRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/ml/diagnostico': {
+      id: '/api/public/ml/diagnostico'
+      path: '/api/public/ml/diagnostico'
+      fullPath: '/api/public/ml/diagnostico'
+      preLoaderRoute: typeof ApiPublicMlDiagnosticoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/ml/refresh': {
       id: '/api/public/ml/refresh'
       path: '/api/public/ml/refresh'
@@ -474,6 +494,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicMlCallbackRoute: ApiPublicMlCallbackRoute,
   ApiPublicMlConnectRoute: ApiPublicMlConnectRoute,
   ApiPublicMlCronRoute: ApiPublicMlCronRoute,
+  ApiPublicMlDiagnosticoRoute: ApiPublicMlDiagnosticoRoute,
   ApiPublicMlRefreshRoute: ApiPublicMlRefreshRoute,
   ApiPublicMlStatusRoute: ApiPublicMlStatusRoute,
   ApiPublicMlWebhookRoute: ApiPublicMlWebhookRoute,

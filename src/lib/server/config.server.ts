@@ -31,13 +31,46 @@ export function getAppUrl(): string {
   return base.replace(/\/+$/, "");
 }
 
-/** Redirect URI do OAuth do Mercado Livre. Deve bater com a cadastrada no app do ML. */
+/**
+ * Redirect URI do OAuth do Mercado Livre.
+ *
+ * O DOMÍNIO DA REQUISIÇÃO MANDA MAIS QUE A VARIÁVEL DE AMBIENTE.
+ *
+ * Por quê: o `redirect_uri` entra duas vezes no fluxo — na ida (montando a URL
+ * de autorização) e na volta (trocando o code por token). O Mercado Livre exige
+ * que os dois sejam iguais, e o retorno só chega se apontar para o host onde o
+ * cliente está navegando. Uma env apontando para OUTRO domínio é sempre uma
+ * configuração velha, e o efeito é o pior possível: o ML recusa com uma tela
+ * genérica, sem dizer o motivo.
+ *
+ * Foi exatamente o que aconteceu ao trocar de domínio: a variável ficou com o
+ * endereço antigo e nenhuma autorização passava, enquanto os dois lados
+ * pareciam corretos quando olhados em separado.
+ *
+ * Fora de uma requisição (cron, script), não há host para consultar — aí vale
+ * o que está configurado.
+ */
 export function getMlRedirectUri(): string {
-  const configured = env("ML_REDIRECT_URI");
-  if (configured) return configured.trim();
-  const base = getAppUrl();
-  if (!base) throw new Error("Configure APP_URL ou ML_REDIRECT_URI.");
-  return `${base}${ML_CALLBACK_PATH}`;
+  const origem = requestOrigin();
+  const configurado = env("ML_REDIRECT_URI");
+
+  if (!origem) {
+    if (configurado) return configurado;
+    const base = getAppUrl();
+    if (!base) throw new Error("Configure APP_URL ou ML_REDIRECT_URI.");
+    return `${base}${ML_CALLBACK_PATH}`;
+  }
+
+  // A env só é usada quando aponta para o MESMO host da requisição — assim um
+  // caminho customizado continua respeitado, sem herdar o domínio errado.
+  if (configurado) {
+    try {
+      if (new URL(configurado).origin === origem) return configurado;
+    } catch {
+      /* env malformada: o host da requisição resolve */
+    }
+  }
+  return `${origem}${ML_CALLBACK_PATH}`;
 }
 
 /** URL pública do webhook de notificações do Mercado Livre. */
