@@ -5,6 +5,16 @@ import { LoaderCircle, LogIn, ShieldCheck, UserPlus } from "lucide-react";
 import { Layout } from "@/components/site/Layout";
 import { supabase } from "@/integrations/supabase/client";
 import { useSessao } from "@/lib/useSessao";
+import { salvarMeuPerfil } from "@/lib/perfil.functions";
+import {
+  cpfValido,
+  digitos,
+  formatarCpf,
+  formatarTelefone,
+  nomeCompletoValido,
+  pinValido,
+  telefoneValido,
+} from "@/lib/cpf";
 
 export const Route = createFileRoute("/entrar")({
   head: () => ({ meta: [{ title: "Entrar | Únific+" }] }),
@@ -29,6 +39,12 @@ function Entrar() {
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
 
+  // Cadastro comercial — só usado no modo "criar".
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [pin, setPin] = useState("");
+
   // Mensagem vinda de um redirect (ex.: tentou conectar sem estar logado).
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -36,11 +52,36 @@ function Entrar() {
     if (msg) setAviso(msg);
   }, []);
 
+  /**
+   * Confere o cadastro ANTES de criar a conta no Supabase.
+   *
+   * A ordem importa: se a conta fosse criada primeiro e o cadastro falhasse
+   * depois, o cliente ficaria com login válido e sem perfil — e o CPF, que é
+   * obrigatório, nunca chegaria. Validando antes, ou entra tudo, ou nada.
+   */
+  const validarCadastro = (): string | null => {
+    if (!nomeCompletoValido(nome)) return "Informe seu nome completo (nome e sobrenome).";
+    if (!telefoneValido(telefone)) return "Telefone inválido. Use DDD + número, como (11) 98765-4321.";
+    if (!cpfValido(cpf)) return "CPF inválido. Confira os números digitados.";
+    const p = pinValido(pin);
+    if (!p.ok) return p.erro;
+    return null;
+  };
+
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
-    setOcupado(true);
     setErro(null);
     setAviso(null);
+
+    if (modo === "criar") {
+      const problema = validarCadastro();
+      if (problema) {
+        setErro(problema);
+        return;
+      }
+    }
+
+    setOcupado(true);
 
     const credenciais = { email: email.trim(), password: senha };
     const { error } =
@@ -48,9 +89,8 @@ function Entrar() {
         ? await supabase.auth.signInWithPassword(credenciais)
         : await supabase.auth.signUp(credenciais);
 
-    setOcupado(false);
-
     if (error) {
+      setOcupado(false);
       setErro(traduzir(error.message));
       return;
     }
@@ -58,11 +98,27 @@ function Entrar() {
     if (modo === "criar") {
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
-        setAviso("Conta criada. Confirme o e-mail para entrar.");
+        // Confirmação de e-mail ainda ligada no Supabase: sem sessão não dá
+        // para gravar o cadastro agora. Desligue em Authentication >
+        // Sign In / Providers > Email > Confirm email.
+        setOcupado(false);
+        setAviso("Conta criada. Confirme o e-mail para entrar e completar seu cadastro.");
         setModo("entrar");
         return;
       }
+
+      try {
+        await salvarMeuPerfil({
+          data: { nomeCompleto: nome, telefone: digitos(telefone), cpf: digitos(cpf), pin: digitos(pin) },
+        });
+      } catch (e2) {
+        setOcupado(false);
+        setErro(e2 instanceof Error ? e2.message : "Não foi possível salvar seu cadastro.");
+        return;
+      }
     }
+
+    setOcupado(false);
 
     const proximo = new URLSearchParams(window.location.search).get("next");
     void router.navigate({ to: proximo === "conectar" ? "/" : "/" });
@@ -142,6 +198,61 @@ function Entrar() {
             onChange={(e) => setSenha(e.target.value)}
             className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
           />
+
+          {modo === "criar" && (
+            <>
+              <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Nome completo</label>
+              <input
+                type="text"
+                required
+                autoComplete="name"
+                placeholder="Maria Silva Santos"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                className="mb-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              />
+
+              <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Telefone</label>
+              <input
+                type="tel"
+                required
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="(11) 98765-4321"
+                value={formatarTelefone(telefone)}
+                onChange={(e) => setTelefone(digitos(e.target.value))}
+                className="mb-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              />
+
+              <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">CPF</label>
+              <input
+                type="text"
+                required
+                inputMode="numeric"
+                placeholder="000.000.000-00"
+                value={formatarCpf(cpf)}
+                onChange={(e) => setCpf(digitos(e.target.value))}
+                className="mb-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              />
+
+              <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">
+                PIN de atendimento
+              </label>
+              <input
+                type="password"
+                required
+                inputMode="numeric"
+                placeholder="4 a 6 números"
+                value={pin}
+                onChange={(e) => setPin(digitos(e.target.value).slice(0, 6))}
+                className="mb-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              />
+              <p className="mb-4 text-[11px] leading-snug text-muted-foreground">
+                Um código curto só seu. Serve para consultar seus pedidos rapidamente e para confirmarmos sua
+                identidade no atendimento. Não é a sua senha — e ninguém, nem nossa equipe, consegue vê-lo.
+              </p>
+            </>
+          )}
 
           {erro && <p className="mb-3 text-xs font-semibold text-destructive">{erro}</p>}
 

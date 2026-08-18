@@ -42,9 +42,12 @@ import {
   Tag,
   Terminal,
   Truck,
+  UserCheck,
   Users,
   XCircle,
 } from "lucide-react";
+import { adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
+import { formatarTelefone } from "@/lib/cpf";
 
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -371,6 +374,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
 type TabId =
   | "dashboard"
   | "contas"
+  | "clientes"
   | "pedidos"
   | "rastreamentos"
   | "sincronizacoes"
@@ -396,6 +400,7 @@ const TABS: Array<{
 }> = [
   { id: "dashboard", label: "Dashboard", icon: Activity, grupo: "Visão geral" },
   { id: "contas", label: "Contas", icon: Users, grupo: "Visão geral" },
+  { id: "clientes", label: "Clientes", icon: UserCheck, grupo: "Visão geral" },
 
   { id: "contaml", label: "Conta ML", icon: Globe, grupo: "Mercado Livre" },
   { id: "pedidos", label: "Pedidos", icon: Package, grupo: "Mercado Livre" },
@@ -543,6 +548,7 @@ function CentralML() {
           <div className="mt-4 space-y-4 pb-12">
             {tab === "dashboard" && <DashboardTab onOpenAccount={(id) => { setAccountId(id); setTab("contas"); }} />}
             {tab === "contas" && <ContasTab accountId={accountId} onSelect={setAccountId} />}
+            {tab === "clientes" && <ClientesTab />}
             {tab === "pedidos" && <PedidosTab accountId={accountId} />}
             {tab === "rastreamentos" && <RastreamentosTab accountId={accountId} />}
             {tab === "sincronizacoes" && <SincronizacoesTab accountId={accountId} />}
@@ -1707,6 +1713,111 @@ function SincronizacoesTab({ accountId }: { accountId: string | null }) {
               </tr>
             ))}
           </Table>
+          <Pager total={data.total} limit={limit} offset={offset} onChange={setOffset} />
+        </>
+      )}
+    </Panel>
+  );
+}
+
+/* ========================================================================== */
+/* Clientes do Únific+                                                        */
+/* ========================================================================== */
+
+/**
+ * Quem criou conta no Únific+.
+ *
+ * O CPF aparece MASCARADO. Ver o número inteiro é um clique deliberado, e cada
+ * revelação vai para admin_audit_log com o e-mail de quem consultou — é o que
+ * separa "olhar a lista" de "acessar dado pessoal", como a LGPD espera.
+ *
+ * Senha não aparece aqui e nunca vai aparecer: ela vive em hash no Supabase
+ * Auth e é ilegível até para o administrador. O PIN idem — a coluna só diz
+ * se existe ou não.
+ */
+function ClientesTab() {
+  const [q, setQ] = useState("");
+  const [termo, setTermo] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [cpfsAbertos, setCpfsAbertos] = useState<Record<string, string>>({});
+  const limit = 50;
+
+  useEffect(() => setOffset(0), [termo]);
+
+  const { data, loading, error, reload } = useAsync(["clientes", termo, offset], () =>
+    adminClientes({ data: { q: termo || null, limit, offset } }),
+  );
+
+  const revelar = async (userId: string) => {
+    try {
+      const r = await adminRevelarCpf({ data: { userId } });
+      setCpfsAbertos((atual) => ({ ...atual, [userId]: r.cpf }));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Não foi possível revelar o CPF.");
+    }
+  };
+
+  return (
+    <Panel
+      title={`Clientes cadastrados${data ? ` (${data.total})` : ""}`}
+      right={
+        <div className="flex items-center gap-2">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && setTermo(q)}
+            placeholder="Nome, e-mail, CPF ou telefone"
+            className="w-56 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-900"
+          />
+          <button onClick={() => setTermo(q)} className="rounded-lg bg-zinc-100 p-1.5 text-zinc-600 hover:bg-zinc-200">
+            <Search className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={reload} className="rounded-lg bg-zinc-100 p-1.5 text-zinc-600 hover:bg-zinc-200">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+      }
+    >
+      {error ? (
+        <ErrorBox message={error} onRetry={reload} />
+      ) : loading ? (
+        <Loading />
+      ) : !data || data.clientes.length === 0 ? (
+        <Empty>Nenhum cliente cadastrado ainda.</Empty>
+      ) : (
+        <>
+          <Table head={["Nome", "E-mail", "Telefone", "CPF", "PIN", "Contas ML", "Cadastro", "Último acesso"]}>
+            {data.clientes.map((c: any) => (
+              <tr key={c.userId} className="border-t border-zinc-100">
+                <td className="px-2 py-2 text-xs font-semibold">{c.nome}</td>
+                <td className="px-2 py-2 text-xs">{c.email || "—"}</td>
+                <td className="px-2 py-2 text-xs">{formatarTelefone(c.telefone)}</td>
+                <td className="px-2 py-2 font-mono text-xs">
+                  {cpfsAbertos[c.userId] ? (
+                    <span className="text-zinc-900">{cpfsAbertos[c.userId]}</span>
+                  ) : (
+                    <button
+                      onClick={() => revelar(c.userId)}
+                      className="text-zinc-500 underline decoration-dotted hover:text-zinc-900"
+                      title="Revelar o CPF completo. A consulta fica registrada na auditoria."
+                    >
+                      {c.cpfMascarado}
+                    </button>
+                  )}
+                </td>
+                <td className="px-2 py-2 text-xs">{c.temPin ? "✓" : "—"}</td>
+                <td className="px-2 py-2 text-xs">
+                  {c.contasMl.length ? c.contasMl.join(", ") : <span className="text-zinc-400">nenhuma</span>}
+                </td>
+                <td className="px-2 py-2 text-xs">{fmtDateTime(c.criadoEm)}</td>
+                <td className="px-2 py-2 text-xs">{c.ultimoAcessoEm ? fmtDateTime(c.ultimoAcessoEm) : "—"}</td>
+              </tr>
+            ))}
+          </Table>
+          <p className="mt-2 px-2 text-[11px] text-zinc-500">
+            Clique no CPF mascarado para ver o número completo — cada consulta fica registrada na Auditoria.
+            Senha e PIN não são exibíveis: ficam guardados em hash e nem a administração consegue lê-los.
+          </p>
           <Pager total={data.total} limit={limit} offset={offset} onChange={setOffset} />
         </>
       )}
