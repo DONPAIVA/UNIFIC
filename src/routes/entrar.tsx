@@ -96,15 +96,24 @@ function Entrar() {
     }
 
     if (modo === "criar") {
-      const { data } = await supabase.auth.getSession();
+      /*
+       * O cadastro precisa de sessão: é ela que identifica o cliente ao gravar
+       * nome, telefone, CPF e PIN. Normalmente o signUp já devolve uma.
+       *
+       * Quando não devolve, entramos com as mesmas credenciais em seguida em
+       * vez de mandar o cliente fazer alguma coisa. Assim ele nunca vê aviso
+       * de "confirme seu e-mail" — cria a conta e já entra.
+       */
+      let { data } = await supabase.auth.getSession();
       if (!data.session) {
-        // Confirmação de e-mail ainda ligada no Supabase: sem sessão não dá
-        // para gravar o cadastro agora. Desligue em Authentication >
-        // Sign In / Providers > Email > Confirm email.
-        setOcupado(false);
-        setAviso("Conta criada. Confirme o e-mail para entrar e completar seu cadastro.");
-        setModo("entrar");
-        return;
+        const { error: erroEntrada } = await supabase.auth.signInWithPassword(credenciais);
+        if (erroEntrada) {
+          setOcupado(false);
+          setErro(traduzir(erroEntrada.message));
+          setModo("entrar");
+          return;
+        }
+        ({ data } = await supabase.auth.getSession());
       }
 
       try {
@@ -289,8 +298,10 @@ function Entrar() {
 function traduzir(mensagem: string): string {
   const m = mensagem.toLowerCase();
   if (m.includes("invalid login credentials")) return "E-mail ou senha incorretos.";
-  if (m.includes("email not confirmed")) return "Confirme seu e-mail antes de entrar.";
   if (m.includes("user already registered")) return "Já existe uma conta com esse e-mail.";
   if (m.includes("password should be")) return "A senha precisa ter pelo menos 6 caracteres.";
+  if (m.includes("signups not allowed") || m.includes("signups are disabled")) {
+    return "Cadastro temporariamente indisponível. Tente novamente em instantes.";
+  }
   return mensagem;
 }
