@@ -5,9 +5,10 @@ import { Mascot } from "./Mascot";
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
-    // Fundo translúcido para o Matrix global (montado em __root) aparecer
-    // através do layout, sem prejudicar a leitura do conteúdo.
-    <div className="flex min-h-screen flex-col bg-navy/70">
+    // Azul da marca, sólido — o mesmo do cabeçalho e do rodapé. Antes era
+    // translúcido para deixar o fundo Matrix aparecer; o Matrix agora é
+    // exclusivo do painel (/centralml).
+    <div className="flex min-h-screen flex-col bg-navy">
       <Header />
       <main className="flex-1 pb-8">{children}</main>
       <HelpBand />

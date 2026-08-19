@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -125,10 +126,21 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  /*
+   * O fundo Matrix é do PAINEL, não do site.
+   *
+   * Na área pública — rastreio, cotação, nota fiscal, login — quem vê é o
+   * cliente final, e ali o que vale é o azul da marca, o mesmo do cabeçalho e
+   * do rodapé. Chuva de caracteres verde ali dentro parece outro produto.
+   *
+   * No /centralml o efeito fica: é a sua área de operação.
+   */
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const ehPainel = pathname.startsWith("/centralml");
+
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Fundo Matrix do site inteiro — fica atrás de tudo, é decorativo. */}
-      <MatrixBackground />
+      {ehPainel && <MatrixBackground />}
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <Toaster richColors position="top-center" />

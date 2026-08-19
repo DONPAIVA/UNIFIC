@@ -110,7 +110,10 @@
     /* Transparente de propÃ³sito: o fundo Matrix global (MatrixBackground,
        fixed com z-index negativo) precisa aparecer atrÃ¡s de tudo. O tom
        escuro de base vem do prÃ³prio componente. */
-    background-color: transparent;
+    /* Azul da marca como base. O fundo Matrix do painel e' um elemento
+       fixed com z-index negativo, entao continua aparecendo por cima desta
+       cor dentro do /centralml. */
+    background-color: var(--navy);
     color: var(--color-foreground);
     font-family: var(--font-sans);
   }
