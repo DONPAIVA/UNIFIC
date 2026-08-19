@@ -89,7 +89,7 @@ import {
 
 export const Route = createFileRoute("/centralml/")({
   component: CentralML,
-  head: () => ({ meta: [{ title: "CentralML — Unific+" }] }),
+  head: () => ({ meta: [{ title: "Olho de Deus ML — Unific+" }] }),
 });
 
 /* ========================================================================== */
@@ -321,7 +321,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
         <div className="mb-5 flex items-center gap-2">
           <ShieldCheck className="h-6 w-6 text-[#3483FA]" />
           <div>
-            <h1 className="text-lg font-black text-zinc-900">CentralML</h1>
+            <h1 className="text-lg font-black text-zinc-900">Olho de Deus ML</h1>
             <p className="text-xs text-zinc-500">Acesso restrito ao administrador.</p>
           </div>
         </div>
@@ -492,7 +492,7 @@ function CentralML() {
             <div className="flex items-center gap-3">
               <LogoML className="h-10 w-10 drop-shadow-sm" />
               <div className="leading-none">
-                <span className="block text-xl font-black tracking-tight text-[#2d3277]">CENTRAL ML NOD</span>
+                <span className="block text-xl font-black tracking-tight text-[#2d3277]">OLHO DE DEUS ML</span>
                 <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wider text-black/55">
                   Únific+ · painel do Mercado Livre
                 </span>

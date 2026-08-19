@@ -64,7 +64,7 @@
   --ring: var(--primary);
 }
 
-/* Tema dinâmico por marketplace */
+/* Tema dinÃ¢mico por marketplace */
 [data-mp="unific"] {
   --primary: oklch(0.75 0.176 60);
   --accent: oklch(0.75 0.176 60);
@@ -107,9 +107,9 @@
     border-color: var(--color-border);
   }
   body {
-    /* Transparente de propósito: o fundo Matrix global (MatrixBackground,
-       fixed com z-index negativo) precisa aparecer atrás de tudo. O tom
-       escuro de base vem do próprio componente. */
+    /* Transparente de propÃ³sito: o fundo Matrix global (MatrixBackground,
+       fixed com z-index negativo) precisa aparecer atrÃ¡s de tudo. O tom
+       escuro de base vem do prÃ³prio componente. */
     background-color: transparent;
     color: var(--color-foreground);
     font-family: var(--font-sans);
@@ -132,7 +132,7 @@
   animation: pulse-ring 2.2s ease-out infinite;
 }
 
-/* Mascote boneco: respiração leve, sem balanço */
+/* Mascote boneco: respiraÃ§Ã£o leve, sem balanÃ§o */
 @keyframes mascot-breathe {
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-2px) scale(1.006); }
@@ -194,7 +194,7 @@
   z-index: 0;
 }
 
-/* Abas de navegação — amarelo */
+/* Abas de navegaÃ§Ã£o â€” amarelo */
 .nav-tab {
   border: 1px solid color-mix(in oklab, var(--nav-yellow) 55%, transparent);
   background: color-mix(in oklab, var(--nav-yellow) 14%, transparent);
@@ -212,7 +212,7 @@
 }
 
 
-/* Caminhão 3D no mapa */
+/* CaminhÃ£o 3D no mapa */
 .truck-3d {
   position: relative;
   width: 64px;
@@ -244,3 +244,21 @@
   .truck-3d--moving img { animation: none; }
 }
 
+/* ---------------------------------------------------------------------------
+   Sem zoom automatico ao tocar num campo (celular)
+
+   O Safari do iPhone da zoom sozinho quando o campo tem fonte menor que 16px —
+   e o painel usa text-xs/text-sm (12 a 14px) para caber mais coluna na tela.
+   O resultado e a pagina "pulando" a cada toque.
+
+   A solucao comum e travar o viewport com maximum-scale=1, mas isso tira o
+   pinch-to-zoom de quem enxerga mal. Aqui o campo so cresce para 16px em
+   aparelhos de toque; no computador a interface continua compacta.
+--------------------------------------------------------------------------- */
+@media (hover: none) and (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
