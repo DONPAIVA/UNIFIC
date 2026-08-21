@@ -8,9 +8,9 @@ import { findPedido, insertTable } from "@/lib/api";
 import { rastrearMinhaCompraCompleta } from "@/lib/minha-conta.functions";
 import { registrarConsultaRastreio } from "@/lib/rastreio.functions";
 import { useSessao } from "@/lib/useSessao";
+import { useCityCoords } from "@/lib/geo";
 import {
   buildMovimentos,
-  coordsFor,
   etaText,
   expectedDate,
   fmtDate,
@@ -129,9 +129,24 @@ export function TrackingPanel() {
     [pedido, tick, eventosReais],
   );
 
+  /*
+   * Coordenadas reais de origem e destino.
+   *
+   * Antes vinham de `coordsFor`, que só conhecia uma lista curta de cidades e,
+   * para as demais, deslocava a capital do estado ao acaso — o pino de
+   * Matozinhos/MG caía ao sul de BH, e a cidade fica ao norte.
+   *
+   * `useCityCoords` mostra a capital de imediato (sem esperar rede) e, assim
+   * que a consulta responde, corrige para a posição verdadeira da cidade.
+   *
+   * Os hooks ficam aqui em cima, fora do `if (pedido)`: React exige que a
+   * ordem de chamada seja sempre a mesma, e dentro do if eles seriam
+   * condicionais.
+   */
+  const from = useCityCoords(pedido?.origin_city ?? "", pedido?.origin_state ?? "");
+  const to = useCityCoords(pedido?.dest_city ?? "", pedido?.dest_state ?? "");
+
   if (pedido) {
-    const from = coordsFor(pedido.origin_state, pedido.origin_city);
-    const to = coordsFor(pedido.dest_state, pedido.dest_city);
     const mk = getMarketplace(pedido.marketplace);
 
     return (

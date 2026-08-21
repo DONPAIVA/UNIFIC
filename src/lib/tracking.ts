@@ -173,16 +173,25 @@ function cityKey(state: string, city: string): string {
 }
 
 /**
- * Coordenada da cidade. Usa a posição real quando a cidade é conhecida;
- * só cai no centro do estado (com leve deslocamento) quando não é.
+ * Coordenada da cidade. Posição real quando a cidade é conhecida; senão, o
+ * centro do estado — SEM deslocamento.
+ *
+ * Havia aqui um deslocamento pseudoaleatório de até ±0,8 grau (uns 88 km)
+ * aplicado sobre a capital quando a cidade não estava na lista. A intenção era
+ * evitar que cidades diferentes caíssem no mesmo ponto, mas o efeito era pior:
+ * o mapa mostrava um pino de aparência precisa num lugar onde a encomenda não
+ * está. Matozinhos/MG, por exemplo, ia parar ao SUL de Belo Horizonte, quando
+ * a cidade fica ao norte.
+ *
+ * Centro do estado é impreciso e se parece com o que é. Um ponto deslocado ao
+ * acaso é impreciso disfarçado de exato — e é isso que engana quem olha.
+ * Quem precisa da posição certa deve usar `useCityCoords` (src/lib/geo.ts),
+ * que consulta a coordenada real da cidade.
  */
 export function coordsFor(state: string, city: string): [number, number] {
   const exact = CITY_COORDS[cityKey(state, city)];
   if (exact) return exact;
-
-  const base = STATE_COORDS[state?.toUpperCase()] ?? STATE_COORDS['SP']!;
-  const h = hash(city ?? "");
-  return [base[0] + ((h % 100) / 100 - 0.5) * 1.6, base[1] + (((h >> 7) % 100) / 100 - 0.5) * 1.6];
+  return STATE_COORDS[state?.toUpperCase()] ?? STATE_COORDS["SP"]!;
 }
 
 function hash(s: string) {
