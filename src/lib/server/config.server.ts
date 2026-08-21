@@ -14,14 +14,45 @@ function env(name: string): string {
   return (process.env[name] ?? "").trim();
 }
 
+/**
+ * Origem pública da requisição (esquema + host), vista pelo NAVEGADOR.
+ *
+ * Atrás do proxy da hospedagem, `request.url` chega como `http://` mesmo o
+ * cliente tendo acessado por `https://` — o TLS termina no proxy, e da porta
+ * dele para dentro o tráfego é HTTP puro.
+ *
+ * Isso não é detalhe: o Mercado Livre compara a redirect_uri caractere por
+ * caractere. `http://` no lugar de `https://` faz a autorização ser recusada,
+ * com a mesma tela genérica que não explica nada.
+ *
+ * `x-forwarded-proto` e `x-forwarded-host` são os cabeçalhos que o proxy usa
+ * para informar o que o cliente realmente pediu. Sem eles, qualquer host que
+ * não seja local é tratado como HTTPS — hospedagem séria não serve HTTP puro,
+ * e errar para o lado seguro aqui custa menos que errar para o inseguro.
+ */
 function requestOrigin(): string {
   try {
     const request = getRequest();
-    if (request?.url) return new URL(request.url).origin;
+    if (!request?.url) return "";
+
+    const url = new URL(request.url);
+    const primeiro = (valor: string | null) => valor?.split(",")[0]?.trim() || "";
+
+    const hostRepassado = primeiro(request.headers.get("x-forwarded-host"));
+    if (hostRepassado) url.host = hostRepassado;
+
+    const protoRepassado = primeiro(request.headers.get("x-forwarded-proto"));
+    if (protoRepassado) {
+      url.protocol = `${protoRepassado}:`;
+    } else if (!/^(localhost|127\.0\.0\.1|\[::1\])$/i.test(url.hostname)) {
+      url.protocol = "https:";
+    }
+
+    return url.origin;
   } catch {
     /* fora de um contexto de requisição */
+    return "";
   }
-  return "";
 }
 
 /** Base pública da aplicação, sem barra final. */
