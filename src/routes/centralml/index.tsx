@@ -52,6 +52,7 @@ import {
 import { adminBloquearCliente, adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
 import { adminAoVivo, adminBloquearIp, adminIpsBloqueados, registrarTentativaPainel } from "@/lib/monitor.functions";
 import loginFundo from "@/assets/login-fundo.jpg";
+import mlLogo from "@/assets/ml-logo.png";
 import { formatarCpf, formatarTelefone, mascararCpf } from "@/lib/cpf";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -394,18 +395,26 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
         A faixa amarela no topo é a assinatura visual deles — é o que faz a tela
         ser reconhecida como "do Mercado Livre" antes mesmo de ler o texto.
       */}
+      {/*
+        Cartão no padrão da tela de login real do Mercado Livre: branco, cantos
+        de 6px, sombra suave, logo centralizada no topo e um respiro generoso.
+        Eles não usam faixa colorida aqui — a marca entra pela logo e pelo azul
+        de ação. Por isso a faixa amarela saiu.
+      */}
       <form
         onSubmit={submit}
-        className="w-full max-w-[22rem] overflow-hidden rounded-xl bg-white shadow-[0_8px_32px_rgba(0,0,0,0.55)]"
+        className="w-full max-w-[23rem] overflow-hidden rounded-md bg-white px-7 py-9 shadow-[0_10px_40px_rgba(0,0,0,0.5)] sm:px-9"
       >
-        <div className="h-1.5 w-full bg-[#FFE600]" />
-
-        <div className="p-7 sm:p-8">
         <div className="flex flex-col items-center text-center">
-          <h1 className="text-base font-black uppercase tracking-[0.14em] text-[#2D3277]">Olho de Deus ML</h1>
-          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
-            Painel do Mercado Livre
-          </p>
+          <img
+            src={mlLogo}
+            alt="Mercado Livre"
+            className="h-16 w-16 rounded-2xl shadow-sm"
+            width={64}
+            height={64}
+          />
+          <h1 className="mt-5 text-[19px] font-semibold leading-snug text-[#2D3277]">Olho de Deus ML</h1>
+          <p className="mt-1 text-[13px] text-zinc-500">Painel do Mercado Livre</p>
         </div>
 
         {notice && (
@@ -450,15 +459,6 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
           </div>
         </div>
 
-        {/* Azul do Mercado Livre nos links — é a cor de ação da marca. */}
-        <button
-          type="button"
-          onClick={() => void recuperarSenha()}
-          className="mt-4 block w-full text-center text-[11px] font-semibold text-[#3483FA] transition hover:underline"
-        >
-          Esqueceu sua senha?
-        </button>
-
         {error && (
           <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-2.5 text-center text-xs font-semibold text-red-700">
             {error}
@@ -470,10 +470,15 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
           </p>
         )}
 
+        {/*
+          Azul #3483FA é a cor de AÇÃO do Mercado Livre — é o botão da tela de
+          login real deles. O amarelo é a cor de identidade, usada em fundo e
+          cabeçalho, não em botão primário. Trocar respeita o padrão da marca.
+        */}
         <button
           type="submit"
           disabled={busy}
-          className="mt-5 flex w-full items-center justify-center gap-2 rounded-md bg-[#FFE600] px-4 py-3.5 text-sm font-bold uppercase tracking-wide text-[#2D3277] shadow-sm transition hover:bg-[#f0d900] disabled:opacity-60"
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-[#3483FA] px-4 py-3.5 text-[15px] font-semibold text-white shadow-sm transition hover:bg-[#2968C8] disabled:opacity-60"
         >
           {busy ? (
             <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -485,12 +490,20 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
           )}
         </button>
 
+        {/* Botão secundário do padrão ML: azul claro de fundo, texto azul. */}
+        <button
+          type="button"
+          onClick={() => void recuperarSenha()}
+          className="mt-3 w-full rounded-md bg-[#3483FA]/10 px-4 py-3 text-[15px] font-semibold text-[#3483FA] transition hover:bg-[#3483FA]/15"
+        >
+          Recuperar acesso
+        </button>
+
         <div className="mt-7 border-t border-zinc-200 pt-4 text-center">
-          <p className="flex items-center justify-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-600">
+          <p className="flex items-center justify-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-600">
             <ShieldCheck className="h-3 w-3" />
             Sistema protegido e monitorado
           </p>
-        </div>
         </div>
       </form>
     </div>
