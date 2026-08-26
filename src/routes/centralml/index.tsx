@@ -51,7 +51,7 @@ import {
 } from "lucide-react";
 import { adminBloquearCliente, adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
 import { adminAoVivo, adminBloquearIp, adminIpsBloqueados, registrarTentativaPainel } from "@/lib/monitor.functions";
-import loginFundo from "@/assets/login-fundo.png";
+import loginFundo from "@/assets/login-fundo.jpg";
 import { formatarCpf, formatarTelefone, mascararCpf } from "@/lib/cpf";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -365,9 +365,15 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
    * `text-base` (16px) nos inputs não é escolha estética: abaixo disso o
    * Safari do iPhone aplica zoom sozinho ao tocar no campo, e a tela "pula".
    */
+  /*
+   * Campo no padrão Mercado Livre: fundo branco, borda cinza fina, e a borda
+   * azul da marca ao focar. `text-base` (16px) impede o zoom automático do
+   * Safari no iPhone.
+   */
   const campo =
-    "w-full rounded-xl border border-white/15 bg-black/40 py-3 pl-11 pr-4 text-base text-white " +
-    "placeholder:text-white/35 outline-none transition focus:border-[#FFE600] focus:bg-black/55";
+    "w-full rounded-md border border-zinc-300 bg-white py-3 pl-11 pr-4 text-base text-zinc-900 " +
+    "placeholder:text-zinc-400 outline-none transition focus:border-[#3483FA] " +
+    "focus:ring-2 focus:ring-[#3483FA]/20";
 
   return (
     <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
@@ -380,29 +386,37 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
       */}
       <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden="true">
         <img src={loginFundo} alt="" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-black/70" />
+        <div className="absolute inset-0 bg-black/55" />
       </div>
 
+      {/*
+        Cartão no padrão Mercado Livre: branco, cantos suaves, sombra discreta.
+        A faixa amarela no topo é a assinatura visual deles — é o que faz a tela
+        ser reconhecida como "do Mercado Livre" antes mesmo de ler o texto.
+      */}
       <form
         onSubmit={submit}
-        className="w-full max-w-[22rem] rounded-3xl border border-white/12 bg-black/75 p-7 shadow-2xl backdrop-blur-md sm:p-8"
+        className="w-full max-w-[22rem] overflow-hidden rounded-xl bg-white shadow-[0_8px_32px_rgba(0,0,0,0.55)]"
       >
+        <div className="h-1.5 w-full bg-[#FFE600]" />
+
+        <div className="p-7 sm:p-8">
         <div className="flex flex-col items-center text-center">
-          <h1 className="text-base font-black uppercase tracking-[0.2em] text-white">Olho de Deus ML</h1>
-          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">
+          <h1 className="text-base font-black uppercase tracking-[0.14em] text-[#2D3277]">Olho de Deus ML</h1>
+          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
             Painel do Mercado Livre
           </p>
         </div>
 
         {notice && (
-          <div className="mt-6 rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-xs text-amber-200">
+          <div className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
             {notice}
           </div>
         )}
 
         <div className="mt-7 space-y-3">
           <div className="relative">
-            <Users className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+            <Users className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <input
               type="email"
               required
@@ -415,7 +429,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
           </div>
 
           <div className="relative">
-            <Key className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+            <Key className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <input
               type={verSenha ? "text" : "password"}
               required
@@ -429,28 +443,29 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
               type="button"
               onClick={() => setVerSenha((v) => !v)}
               aria-label={verSenha ? "Ocultar senha" : "Mostrar senha"}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-white/40 transition hover:text-white/80"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-2 text-zinc-400 transition hover:text-zinc-700"
             >
               {verSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
         </div>
 
+        {/* Azul do Mercado Livre nos links — é a cor de ação da marca. */}
         <button
           type="button"
           onClick={() => void recuperarSenha()}
-          className="mt-4 block w-full text-center text-[10px] font-bold uppercase tracking-[0.16em] text-white/45 transition hover:text-white/80"
+          className="mt-4 block w-full text-center text-[11px] font-semibold text-[#3483FA] transition hover:underline"
         >
           Esqueceu sua senha?
         </button>
 
         {error && (
-          <p className="mt-4 rounded-lg border border-red-500/25 bg-red-500/10 p-2.5 text-center text-xs font-semibold text-red-300">
+          <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-2.5 text-center text-xs font-semibold text-red-700">
             {error}
           </p>
         )}
         {aviso && (
-          <p className="mt-4 rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-2.5 text-center text-xs font-semibold text-emerald-300">
+          <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-2.5 text-center text-xs font-semibold text-emerald-700">
             {aviso}
           </p>
         )}
@@ -458,7 +473,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
         <button
           type="submit"
           disabled={busy}
-          className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FFE600] px-4 py-3.5 text-sm font-black uppercase tracking-wider text-[#2d3277] transition hover:bg-[#f5dd00] disabled:opacity-60"
+          className="mt-5 flex w-full items-center justify-center gap-2 rounded-md bg-[#FFE600] px-4 py-3.5 text-sm font-bold uppercase tracking-wide text-[#2D3277] shadow-sm transition hover:bg-[#f0d900] disabled:opacity-60"
         >
           {busy ? (
             <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -470,11 +485,12 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
           )}
         </button>
 
-        <div className="mt-8 border-t border-white/10 pt-5 text-center">
-          <p className="flex items-center justify-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-400/80">
+        <div className="mt-7 border-t border-zinc-200 pt-4 text-center">
+          <p className="flex items-center justify-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-600">
             <ShieldCheck className="h-3 w-3" />
             Sistema protegido e monitorado
           </p>
+        </div>
         </div>
       </form>
     </div>
