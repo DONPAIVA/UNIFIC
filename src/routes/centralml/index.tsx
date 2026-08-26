@@ -303,6 +303,65 @@ function useAsync<T>(chave: unknown[], fn: () => Promise<T>, enabled = true): As
 /* Login                                                                      */
 /* ========================================================================== */
 
+/**
+ * Sangue escorrendo da borda de baixo do cartão.
+ *
+ * Feito com divs em vez de imagem: escala em qualquer largura sem borrar, não
+ * pesa no carregamento e acompanha o cartão quando ele encolhe no celular.
+ *
+ * Os pingos têm larguras, alturas e posições irregulares de propósito —
+ * espaçamento uniforme denuncia que é enfeite e mata o efeito.
+ *
+ * `aria-hidden` e `pointer-events-none`: é decoração pura, não deve ser lida
+ * por leitor de tela nem atrapalhar o clique nos campos.
+ */
+function SangueEscorrendo() {
+  // esquerda %, largura px, altura px
+  const pingos: Array<[number, number, number]> = [
+    [4, 9, 16],
+    [11, 13, 30],
+    [19, 7, 11],
+    [27, 11, 22],
+    [36, 8, 38],
+    [45, 14, 18],
+    [54, 9, 27],
+    [62, 7, 13],
+    [70, 12, 34],
+    [79, 8, 20],
+    [87, 11, 15],
+    [94, 8, 25],
+  ];
+
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0" aria-hidden="true">
+      <div className="relative">
+        {/* Poça na borda: dá o ponto de partida de onde o sangue escorre. */}
+        <div className="absolute inset-x-0 -bottom-[6px] h-[10px] rounded-b-lg bg-[#8B0000]" />
+
+        {pingos.map(([esquerda, largura, altura], i) => (
+          <span
+            key={i}
+            className="absolute rounded-b-full bg-[#8B0000]"
+            style={{
+              left: `${esquerda}%`,
+              width: `${largura}px`,
+              height: `${altura}px`,
+              bottom: `${-altura + 2}px`,
+            }}
+          />
+        ))}
+
+        {/* Duas gotas soltas, caindo em tempos diferentes. */}
+        <span className="animate-gota absolute left-[36%] -bottom-12 h-2.5 w-2 rounded-full bg-[#8B0000]" />
+        <span
+          className="animate-gota absolute left-[70%] -bottom-12 h-2 w-1.5 rounded-full bg-[#8B0000]"
+          style={{ animationDelay: "1.9s" }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: string | null }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -372,9 +431,10 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
    * Safari no iPhone.
    */
   const campo =
-    "w-full rounded-md border border-zinc-300 bg-white py-3 pl-11 pr-4 text-base text-zinc-900 " +
-    "placeholder:text-zinc-400 outline-none transition focus:border-[#3483FA] " +
-    "focus:ring-2 focus:ring-[#3483FA]/20";
+    "w-full rounded-lg border-2 border-[#FFE600] bg-white py-3 pl-11 pr-4 text-base text-zinc-900 " +
+    "placeholder:text-zinc-400 placeholder:text-[13px] placeholder:font-semibold " +
+    "placeholder:uppercase placeholder:tracking-wider outline-none transition " +
+    "focus:border-[#3483FA] focus:ring-2 focus:ring-[#3483FA]/20";
 
   return (
     <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
@@ -401,20 +461,31 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
         Eles não usam faixa colorida aqui — a marca entra pela logo e pelo azul
         de ação. Por isso a faixa amarela saiu.
       */}
+      {/*
+        `relative` sem `overflow-hidden`: o sangue precisa escorrer PARA FORA do
+        cartão. Com overflow escondido ele seria cortado na borda e viraria só
+        uma faixa vermelha.
+      */}
       <form
         onSubmit={submit}
-        className="w-full max-w-[23rem] overflow-hidden rounded-md bg-white px-7 py-9 shadow-[0_10px_40px_rgba(0,0,0,0.5)] sm:px-9"
+        className="relative w-full max-w-[23rem] rounded-xl border-2 border-[#FFE600] bg-white px-7 py-9 shadow-[0_10px_40px_rgba(0,0,0,0.55)] sm:px-9"
       >
+        <SangueEscorrendo />
+
         <div className="flex flex-col items-center text-center">
           <img
             src={mlLogo}
             alt="Mercado Livre"
-            className="h-16 w-16 rounded-2xl shadow-sm"
+            className="h-16 w-16 rounded-2xl shadow-sm ring-2 ring-[#FFE600]/60"
             width={64}
             height={64}
           />
-          <h1 className="mt-5 text-[19px] font-semibold leading-snug text-[#2D3277]">Olho de Deus ML</h1>
-          <p className="mt-1 text-[13px] text-zinc-500">Painel do Mercado Livre</p>
+          <h1 className="mt-5 text-[17px] font-black uppercase tracking-[0.18em] text-[#2D3277]">
+            Olho de Deus ML
+          </h1>
+          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
+            Painel do Mercado Livre
+          </p>
         </div>
 
         {notice && (

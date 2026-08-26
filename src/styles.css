@@ -265,3 +265,27 @@
     font-size: 16px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Gota de sangue caindo (tela de login do painel)
+
+   Fica invisivel quase o tempo todo e cai rapido: gota escorrendo sem parar
+   vira ruido visual. O intervalo longo entre uma queda e outra e o que faz o
+   efeito parecer real em vez de animacao em laco.
+
+   prefers-reduced-motion respeitado: quem pediu menos movimento no sistema
+   ve os pingos parados, sem a queda.
+--------------------------------------------------------------------------- */
+@keyframes gota-sangue {
+  0%, 82%   { transform: translateY(0); opacity: 0; }
+  84%       { opacity: 1; }
+  100%      { transform: translateY(52px); opacity: 0; }
+}
+
+.animate-gota {
+  animation: gota-sangue 4.5s ease-in infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-gota { animation: none; opacity: 0; }
+}
