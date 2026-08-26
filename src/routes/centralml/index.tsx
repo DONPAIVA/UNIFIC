@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import { adminBloquearCliente, adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
 import { adminAoVivo, adminBloquearIp, adminIpsBloqueados, registrarTentativaPainel } from "@/lib/monitor.functions";
+import loginFundo from "@/assets/login-fundo.png";
 import { formatarCpf, formatarTelefone, mascararCpf } from "@/lib/cpf";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -370,6 +371,18 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
 
   return (
     <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
+      {/*
+        Arte de fundo da tela de login.
+
+        `fixed` + `-z-10` a deixa atrás do cartão sem empurrar layout, e o véu
+        preto por cima garante contraste: sem ele, o amarelo forte da imagem
+        come o texto branco dos campos e o formulário fica ilegível.
+      */}
+      <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden="true">
+        <img src={loginFundo} alt="" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-black/70" />
+      </div>
+
       <form
         onSubmit={submit}
         className="w-full max-w-[22rem] rounded-3xl border border-white/12 bg-black/75 p-7 shadow-2xl backdrop-blur-md sm:p-8"
