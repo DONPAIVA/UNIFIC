@@ -40,6 +40,9 @@ import {
   Settings,
   ShieldCheck,
   Tag,
+  ArrowRight,
+  Eye,
+  EyeOff,
   Terminal,
   Truck,
   UserCheck,
@@ -302,6 +305,8 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [verSenha, setVerSenha] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -316,53 +321,138 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
     onSignedIn();
   };
 
+  /*
+   * Recuperação de senha pelo próprio Supabase Auth.
+   * O link chega por e-mail e leva de volta ao painel.
+   */
+  const recuperarSenha = async () => {
+    const alvo = email.trim();
+    if (!alvo) {
+      setError("Digite seu e-mail no campo acima para receber o link de recuperação.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const { error: erro } = await supabase.auth.resetPasswordForEmail(alvo, {
+      redirectTo: `${window.location.origin}/centralml`,
+    });
+    setBusy(false);
+    setAviso(erro ? null : "Se este e-mail tiver acesso, o link de recuperação chegará em instantes.");
+    if (erro) setError(erro.message);
+  };
+
+  /*
+   * Campos escuros com ícone à esquerda.
+   *
+   * `text-base` (16px) nos inputs não é escolha estética: abaixo disso o
+   * Safari do iPhone aplica zoom sozinho ao tocar no campo, e a tela "pula".
+   */
+  const campo =
+    "w-full rounded-xl border border-white/15 bg-black/40 py-3 pl-11 pr-4 text-base text-white " +
+    "placeholder:text-white/35 outline-none transition focus:border-[#FFE600] focus:bg-black/55";
+
   return (
-    <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white/95 p-6 shadow-xl backdrop-blur">
-        <div className="mb-5 flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-[#3483FA]" />
-          <div>
-            <h1 className="text-lg font-black text-zinc-900">Olho de Deus ML</h1>
-            <p className="text-xs text-zinc-500">Acesso restrito ao administrador.</p>
+    <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
+      <form
+        onSubmit={submit}
+        className="w-full max-w-[22rem] rounded-3xl border border-white/12 bg-black/75 p-7 shadow-2xl backdrop-blur-md sm:p-8"
+      >
+        <div className="flex flex-col items-center text-center">
+          <LogoML className="h-16 w-16 drop-shadow-lg" />
+          <h1 className="mt-5 text-sm font-black uppercase tracking-[0.22em] text-white">Acesso restrito</h1>
+          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">
+            Painel do Mercado Livre
+          </p>
+        </div>
+
+        {notice && (
+          <div className="mt-6 rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-xs text-amber-200">
+            {notice}
+          </div>
+        )}
+
+        <div className="mt-7 space-y-3">
+          <div className="relative">
+            <Users className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+            <input
+              type="email"
+              required
+              autoComplete="username"
+              placeholder="USUÁRIO"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={campo}
+            />
+          </div>
+
+          <div className="relative">
+            <Key className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+            <input
+              type={verSenha ? "text" : "password"}
+              required
+              autoComplete="current-password"
+              placeholder="SENHA"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={`${campo} pr-12`}
+            />
+            <button
+              type="button"
+              onClick={() => setVerSenha((v) => !v)}
+              aria-label={verSenha ? "Ocultar senha" : "Mostrar senha"}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-white/40 transition hover:text-white/80"
+            >
+              {verSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
         </div>
 
-        {notice && <div className="mb-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">{notice}</div>}
+        <button
+          type="button"
+          onClick={() => void recuperarSenha()}
+          className="mt-4 block w-full text-center text-[10px] font-bold uppercase tracking-[0.16em] text-white/45 transition hover:text-white/80"
+        >
+          Esqueceu sua senha?
+        </button>
 
-        <label className="mb-1 block text-xs font-bold uppercase text-zinc-500">E-mail</label>
-        <input
-          type="email"
-          required
-          autoComplete="username"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="mb-3 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-[#3483FA]"
-        />
-
-        <label className="mb-1 block text-xs font-bold uppercase text-zinc-500">Senha</label>
-        <input
-          type="password"
-          required
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-[#3483FA]"
-        />
-
-        {error && <p className="mb-3 text-xs font-semibold text-red-600">{error}</p>}
+        {error && (
+          <p className="mt-4 rounded-lg border border-red-500/25 bg-red-500/10 p-2.5 text-center text-xs font-semibold text-red-300">
+            {error}
+          </p>
+        )}
+        {aviso && (
+          <p className="mt-4 rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-2.5 text-center text-xs font-semibold text-emerald-300">
+            {aviso}
+          </p>
+        )}
 
         <button
           type="submit"
           disabled={busy}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#3483FA] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#2968C8] disabled:opacity-60"
+          className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FFE600] px-4 py-3.5 text-sm font-black uppercase tracking-wider text-[#2d3277] transition hover:bg-[#f5dd00] disabled:opacity-60"
         >
-          {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
-          Entrar
+          {busy ? (
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              Entrar no painel
+              <ArrowRight className="h-4 w-4" />
+            </>
+          )}
         </button>
 
-        <p className="mt-4 text-center text-[11px] text-zinc-500">
-          A permissão é validada no servidor. Um login válido sem cadastro em admin_users continua bloqueado.
-        </p>
+        <div className="mt-8 border-t border-white/10 pt-5 text-center">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/70">
+            Únific+ · Olho de Deus
+          </p>
+          <p className="mt-1.5 flex items-center justify-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-400/80">
+            <ShieldCheck className="h-3 w-3" />
+            Sistema protegido e monitorado
+          </p>
+          <p className="mt-3 text-[10px] leading-relaxed text-white/30">
+            A permissão é validada no servidor. Um login válido sem cadastro em admin_users continua bloqueado.
+          </p>
+        </div>
       </form>
     </div>
   );
