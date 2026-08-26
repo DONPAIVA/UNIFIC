@@ -625,6 +625,25 @@ export async function fetchQuestion(account: MlAccount, questionId: string) {
   return mlFetch(account, `/questions/${questionId}`);
 }
 
+/**
+ * Revoga a autorização do SEU aplicativo na conta da pessoa.
+ *
+ * Endpoint oficial: DELETE /users/{user_id}/applications/{app_id}.
+ * É o mesmo efeito de a pessoa remover o app em
+ * "Minha conta → Segurança → Aplicativos conectados": o Únific+ some da lista
+ * dela e os tokens morrem na hora.
+ *
+ * IRREVERSÍVEL pelo seu lado. Para voltar, só ela autorizando de novo.
+ *
+ * Usa o token DELA — é a credencial que representa a concessão sendo revogada.
+ */
+export function revogarAutorizacao(account: MlAccount, appId: string) {
+  return mlFetch(account, `/users/${account.ml_user_id}/applications/${appId}`, {
+    method: "DELETE",
+    actor: "centralml",
+  });
+}
+
 /** Detalhe de um anúncio (tópicos items / items_prices). */
 export function fetchItem(account: MlAccount, itemId: string) {
   return mlFetch(account, `/items/${itemId}`);

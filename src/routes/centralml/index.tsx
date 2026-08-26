@@ -46,7 +46,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
+import { adminBloquearCliente, adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
 import { formatarCpf, formatarTelefone, mascararCpf } from "@/lib/cpf";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -79,6 +79,7 @@ import {
   adminReprocessWebhook,
   adminSession,
   adminShipments,
+  adminRevogarAutorizacao,
   adminSuspenderConexao,
   adminSyncAccount,
   adminSyncRuns,
@@ -882,6 +883,33 @@ function ContasTab({ accountId, onSelect }: { accountId: string | null; onSelect
                       Suspender
                     </button>
                   )}
+                  {/*
+                    Revogar é diferente de suspender: apaga a concessão DENTRO
+                    do Mercado Livre. O app some de "Aplicativos conectados" na
+                    conta da pessoa e não há como desfazer deste lado — por isso
+                    a confirmação exige digitar o apelido.
+                  */}
+                  <button
+                    disabled={busy !== null}
+                    onClick={() => {
+                      const nome = a.nickname || String(a.ml_user_id);
+                      const digitado = prompt(
+                        `REVOGAR a autorização de ${nome} no Mercado Livre?\n\n` +
+                          `O Únific+ sai de "Aplicativos conectados" na conta dela e os tokens são apagados.\n` +
+                          `NÃO dá para desfazer: só ela pode autorizar de novo.\n\n` +
+                          `Para confirmar, digite o apelido da conta:`,
+                      );
+                      if (digitado === null) return;
+                      if (digitado.trim() !== nome) {
+                        alert("Apelido não confere. Nada foi feito.");
+                        return;
+                      }
+                      void run("Revogar", a.id, () => adminRevogarAutorizacao({ data: { accountId: a.id } }));
+                    }}
+                    className="rounded-md bg-red-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    Revogar no ML
+                  </button>
                   <button
                     disabled={busy !== null}
                     onClick={() => {
@@ -1834,6 +1862,33 @@ function ClientesTab() {
     }
   };
 
+  /*
+   * Bloquear tira o acesso da pessoa ao site inteiro, então pede confirmação.
+   * Desbloquear é inofensivo e vai direto.
+   */
+  const alternarBloqueio = async (c: any) => {
+    if (c.bloqueado) {
+      try {
+        await adminBloquearCliente({ data: { userId: c.userId, bloquear: false } });
+        reload();
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "Não foi possível desbloquear.");
+      }
+      return;
+    }
+
+    if (!confirm(`Bloquear ${c.nome}?\n\nEla perde o acesso ao Únific+ imediatamente e passa a ver apenas um aviso de conta suspensa. Você pode desfazer a qualquer momento.`)) {
+      return;
+    }
+    const motivo = prompt("Motivo (opcional — aparece para o cliente):") ?? "";
+    try {
+      await adminBloquearCliente({ data: { userId: c.userId, bloquear: true, motivo } });
+      reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Não foi possível bloquear.");
+    }
+  };
+
   return (
     <Panel
       title={`Clientes cadastrados${data ? ` (${data.total})` : ""}`}
@@ -1863,10 +1918,20 @@ function ClientesTab() {
         <Empty>Nenhum cliente cadastrado ainda.</Empty>
       ) : (
         <>
-          <Table head={["Nome", "E-mail", "Telefone", "CPF", "PIN", "Contas ML", "Cadastro", "Último acesso"]}>
+          <Table head={["Nome", "E-mail", "Telefone", "CPF", "PIN", "Contas ML", "Cadastro", "Último acesso", "Acesso"]}>
             {data.clientes.map((c: any) => (
-              <tr key={c.userId} className="border-t border-zinc-100">
-                <td className="px-2 py-2 text-xs font-semibold">{c.nome}</td>
+              <tr key={c.userId} className={`border-t border-zinc-100 ${c.bloqueado ? "bg-red-50/60" : ""}`}>
+                <td className="px-2 py-2 text-xs font-semibold">
+                  {c.nome}
+                  {c.bloqueado && (
+                    <span
+                      className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700"
+                      title={c.motivoBloqueio ?? "Sem motivo informado"}
+                    >
+                      BLOQUEADO
+                    </span>
+                  )}
+                </td>
                 <td className="px-2 py-2 text-xs">{c.email || "—"}</td>
                 <td className="px-2 py-2 text-xs">{formatarTelefone(c.telefone)}</td>
                 <td className="px-2 py-2 font-mono text-xs">
@@ -1888,6 +1953,18 @@ function ClientesTab() {
                 </td>
                 <td className="px-2 py-2 text-xs">{fmtDateTime(c.criadoEm)}</td>
                 <td className="px-2 py-2 text-xs">{c.ultimoAcessoEm ? fmtDateTime(c.ultimoAcessoEm) : "—"}</td>
+                <td className="px-2 py-2 text-xs">
+                  <button
+                    onClick={() => void alternarBloqueio(c)}
+                    className={`rounded-lg px-2 py-1 text-[11px] font-bold ${
+                      c.bloqueado
+                        ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                        : "bg-red-100 text-red-700 hover:bg-red-200"
+                    }`}
+                  >
+                    {c.bloqueado ? "Liberar" : "Bloquear"}
+                  </button>
+                </td>
               </tr>
             ))}
           </Table>

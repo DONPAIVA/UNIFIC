@@ -55,6 +55,95 @@ export const salvarMeuPerfil = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/**
+ * O acesso do usuário logado está liberado?
+ *
+ * Chamada pelo Layout em toda página. NÃO usa `requireUser`: aquele middleware
+ * lança quando o usuário está bloqueado, e aqui é justamente o bloqueio que
+ * precisamos relatar em vez de virar erro.
+ *
+ * Sem sessão, devolve liberado — visitante anônimo usa o site normalmente.
+ */
+export const meuAcesso = createServerFn({ method: "GET" }).handler(async () => {
+  const { resolveRequester } = await import("./server/auth.server");
+  const requester = await resolveRequester();
+  if (!requester) return { autenticado: false, bloqueado: false, motivo: null as string | null };
+
+  if (!requester.bloqueado) {
+    return { autenticado: true, bloqueado: false, motivo: null as string | null };
+  }
+
+  const { db } = await import("./server/db.server");
+  const { data } = await db("clientes_bloqueados")
+    .select("motivo")
+    .eq("user_id", requester.userId)
+    .maybeSingle();
+
+  return { autenticado: true, bloqueado: true, motivo: (data?.motivo as string) ?? null };
+});
+
+/**
+ * Bloqueia ou libera o acesso de um cliente.
+ *
+ * O cache de sessões guarda a identidade por até 60 s. Sem invalidá-lo, o
+ * bloqueado continuaria navegando por até um minuto depois do clique — e para
+ * quem aperta o botão isso parece que não funcionou.
+ */
+export const adminBloquearCliente = createServerFn({ method: "POST" })
+  .middleware([requireAdminUser])
+  .inputValidator((input: { userId: string; bloquear: boolean; motivo?: string }) => ({
+    userId: String(input?.userId ?? ""),
+    bloquear: Boolean(input?.bloquear),
+    motivo: String(input?.motivo ?? "").trim().slice(0, 300),
+  }))
+  .handler(async ({ data, context }) => {
+    if (!data.userId) throw new Error("Cliente não informado.");
+    if (data.userId === context.user.userId) {
+      throw new Error("Você não pode bloquear a própria conta.");
+    }
+
+    const { db } = await import("./server/db.server");
+    const { invalidarCacheSessoes } = await import("./server/auth.server");
+    const { logAudit } = await import("./server/audit.server");
+
+    const { data: perfil } = await db("clientes_perfil")
+      .select("email, nome_completo")
+      .eq("user_id", data.userId)
+      .maybeSingle();
+
+    if (data.bloquear) {
+      const { error } = await db("clientes_bloqueados").upsert(
+        {
+          user_id: data.userId,
+          email: (perfil?.email as string) ?? null,
+          motivo: data.motivo || null,
+          bloqueado_em: new Date().toISOString(),
+          bloqueado_por: context.user.email,
+        },
+        { onConflict: "user_id" },
+      );
+      if (error) throw new Error(`Não foi possível bloquear: ${error.message}`);
+    } else {
+      const { error } = await db("clientes_bloqueados").delete().eq("user_id", data.userId);
+      if (error) throw new Error(`Não foi possível desbloquear: ${error.message}`);
+    }
+
+    invalidarCacheSessoes();
+
+    await logAudit({
+      adminUserId: context.user.userId,
+      adminEmail: context.user.email,
+      ip: context.user.ip,
+      action: data.bloquear ? "cliente.bloqueado" : "cliente.desbloqueado",
+      entity: "clientes_bloqueados",
+      entityId: data.userId,
+      success: true,
+      detail: { cliente: perfil?.nome_completo ?? null, motivo: data.motivo || null },
+    });
+
+    return { ok: true, bloqueado: data.bloquear };
+  });
+
 /** Perfil do próprio cliente, para preencher a tela "minha conta". */
 export const meuPerfil = createServerFn({ method: "GET" })
   .middleware([requireUser])
@@ -108,8 +197,18 @@ export const adminClientes = createServerFn({ method: "GET" })
     const { data: linhas, count, error } = await q;
     if (error) throw new Error(error.message);
 
-    // Contas do Mercado Livre que cada cliente conectou.
+    // Quem está bloqueado, numa consulta só.
     const ids = (linhas ?? []).map((c: any) => c.user_id);
+    const bloqueados = new Map<string, string | null>();
+    if (ids.length) {
+      const { data: bl } = await admin
+        .from("clientes_bloqueados")
+        .select("user_id, motivo")
+        .in("user_id", ids);
+      for (const b of bl ?? []) bloqueados.set(String((b as any).user_id), (b as any).motivo ?? null);
+    }
+
+    // Contas do Mercado Livre que cada cliente conectou.
     const contasPorDono = new Map<string, string[]>();
     if (ids.length) {
       const { data: contas } = await admin
@@ -136,6 +235,8 @@ export const adminClientes = createServerFn({ method: "GET" })
         criadoEm: c.criado_em,
         ultimoAcessoEm: c.ultimo_acesso_em,
         contasMl: contasPorDono.get(String(c.user_id)) ?? [],
+        bloqueado: bloqueados.has(String(c.user_id)),
+        motivoBloqueio: bloqueados.get(String(c.user_id)) ?? null,
       })),
     };
   });

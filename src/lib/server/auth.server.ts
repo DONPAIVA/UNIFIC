@@ -127,11 +127,38 @@ export async function resolveRequester(): Promise<Requester | null> {
     userId,
     email,
     isAdmin: await isAdminUser(userId, email),
+    bloqueado: await isClienteBloqueado(userId),
     ip: ipFromHeaders(request.headers),
   };
 
   gravarCache(token, requester);
   return requester;
+}
+
+/**
+ * O acesso deste usuário foi suspenso pelo administrador?
+ *
+ * A checagem fica AQUI, no ponto por onde toda identidade passa, e não em cada
+ * tela: uma rota nova esquecida viraria uma porta aberta para quem foi
+ * bloqueado.
+ *
+ * Erro de consulta devolve `false` de propósito. Se o banco oscilar, a escolha
+ * é entre derrubar todos os clientes ou deixar um bloqueado passar por alguns
+ * segundos — e derrubar todo mundo é o dano maior. O bloqueio não é uma
+ * barreira de segurança contra invasor; é uma decisão comercial sua.
+ */
+async function isClienteBloqueado(userId: string): Promise<boolean> {
+  try {
+    const { db } = await import("./db.server");
+    const { data, error } = await db("clientes_bloqueados")
+      .select("user_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) return false;
+    return Boolean(data);
+  } catch {
+    return false;
+  }
 }
 
 /**

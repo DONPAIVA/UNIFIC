@@ -15,13 +15,27 @@ export type Requester = {
   email: string;
   isAdmin: boolean;
   ip: string | null;
+  /** Acesso suspenso pelo administrador. */
+  bloqueado?: boolean;
 };
+
+/**
+ * Marcador do bloqueio, reconhecido pela interface.
+ *
+ * A mensagem viaja como texto até o navegador; o prefixo é o que permite a
+ * tela distinguir "conta bloqueada" de qualquer outro erro e mostrar o aviso
+ * próprio em vez de um erro genérico.
+ */
+export const ERRO_BLOQUEADO = "CONTA_BLOQUEADA";
 
 /** Exige um cliente autenticado. O administrador também passa. */
 export const requireUser = createMiddleware({ type: "function" }).server(async ({ next }) => {
   const { resolveRequester } = await import("./server/auth.server");
   const requester = await resolveRequester();
   if (!requester) throw new Error("Faça login para continuar.");
+  // O bloqueio vale para TODA ação: sem ele aqui, bastaria uma tela esquecida
+  // para o bloqueado continuar operando.
+  if (requester.bloqueado) throw new Error(ERRO_BLOQUEADO);
   return next({ context: { user: requester } });
 });
 
@@ -30,6 +44,7 @@ export const requireAdminUser = createMiddleware({ type: "function" }).server(as
   const { resolveRequester } = await import("./server/auth.server");
   const requester = await resolveRequester();
   if (!requester) throw new Error("Faça login para continuar.");
+  if (requester.bloqueado) throw new Error(ERRO_BLOQUEADO);
   if (!requester.isAdmin) throw new Error("Acesso restrito: usuário sem permissão administrativa.");
   return next({ context: { user: requester } });
 });

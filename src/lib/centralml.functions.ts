@@ -1664,6 +1664,72 @@ export const adminReclamacaoAcao = createServerFn({ method: "POST" })
  * e acionar o suporte deles. Nenhuma API permite tirar isso de alguém —
  * e é assim que deve ser.
  */
+/**
+ * Revoga a autorização do aplicativo DENTRO da conta do Mercado Livre.
+ *
+ * Diferente de `adminSuspenderConexao`, que só esconde a conta no Únific+ e
+ * preserva os tokens: aqui a concessão morre no lado do Mercado Livre. O
+ * aplicativo desaparece de "Aplicativos conectados" no app dela.
+ *
+ * IRREVERSÍVEL: só a própria pessoa pode autorizar de novo.
+ *
+ * A conexão local é marcada como desconectada e os tokens são apagados —
+ * guardar credencial que não vale mais é só superfície exposta à toa.
+ */
+export const adminRevogarAutorizacao = createServerFn({ method: "POST" })
+  .middleware([requireAdminUser])
+  .inputValidator((input: { accountId: string }) => ({ accountId: String(input?.accountId ?? "") }))
+  .handler(async ({ data, context }) => {
+    await requireOwnedAccount(context.user, data.accountId);
+
+    const { db } = await import("./server/db.server");
+    const { getAccount, revogarAutorizacao } = await import("./server/ml-api.server");
+    const { getMlCredentials } = await import("./server/config.server");
+    const { logAudit } = await import("./server/audit.server");
+
+    const conta = await getAccount(data.accountId);
+    const { clientId } = getMlCredentials();
+
+    const res = await revogarAutorizacao(conta, clientId);
+
+    await logAudit({
+      adminUserId: context.user.userId,
+      adminEmail: context.user.email,
+      ip: context.user.ip,
+      action: "conta.autorizacao_revogada",
+      entity: "ml_connections",
+      entityId: conta.id,
+      accountId: conta.id,
+      success: res.ok,
+      detail: {
+        nickname: conta.nickname,
+        ml_user_id: conta.ml_user_id,
+        http_status: res.status,
+        resposta: res.ok ? null : res.error,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`O Mercado Livre recusou a revogação (${res.error ?? res.status}).`);
+    }
+
+    // Só depois da confirmação do ML apagamos os tokens: se a chamada tivesse
+    // falhado, jogar fora as credenciais deixaria a conta inacessível sem ter
+    // revogado nada de fato.
+    await db("ml_connections")
+      .update({
+        status: "disconnected",
+        access_token: null,
+        refresh_token: null,
+        expires_at: null,
+        last_error: `Autorização revogada por ${context.user.email}.`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", conta.id);
+
+    return { ok: true, nickname: conta.nickname };
+  });
+
 export const adminSuspenderConexao = createServerFn({ method: "POST" })
   .middleware([requireAdminUser])
   .inputValidator((input: { accountId: string; suspender: boolean; motivo?: string }) => ({

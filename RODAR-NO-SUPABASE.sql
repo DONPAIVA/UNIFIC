@@ -1,5 +1,5 @@
 -- ============================================================================
--- UNIFIC+ — migrations pendentes. Cole TUDO no SQL Editor do Supabase e Run.
+-- UNIFIC+ â€” migrations pendentes. Cole TUDO no SQL Editor do Supabase e Run.
 -- Seguro rodar mais de uma vez. Nada e apagado.
 -- PARTE 1: destrava o pedido compartilhado entre comprador e vendedor (URGENTE)
 -- PARTE 2: tabelas das notificacoes do Mercado Livre
@@ -8,7 +8,7 @@
 
 
 -- ============================================================================
--- PARTE 1 — PEDIDO COMPARTILHADO (corrige o erro de chave duplicada)
+-- PARTE 1 â€” PEDIDO COMPARTILHADO (corrige o erro de chave duplicada)
 -- ============================================================================
 
 -- ============================================================================
@@ -17,28 +17,28 @@
 -- ============================================================================
 --
 -- O SINTOMA
---   Pedido 2000017986518784: valor de chave duplicado viola a restriÃ§Ã£o
+--   Pedido 2000017986518784: valor de chave duplicado viola a restriÃƒÂ§ÃƒÂ£o
 --   exclusiva "ml_orders_order_id_key"
--- A sincronizaÃ§Ã£o inteira aborta e a conta fica com status ERRO.
+-- A sincronizaÃƒÂ§ÃƒÂ£o inteira aborta e a conta fica com status ERRO.
 --
 -- A CAUSA
 -- `ml_orders` veio de um schema antigo em que o identificador era a coluna
 -- `order_id`, com UNIQUE GLOBAL. A migration 20260815100000 criou um gatilho
 -- que espelha ml_order_id -> order_id para manter esse legado coerente.
 --
--- Efeito colateral: aquele UNIQUE passou a valer para a tabela toda, e nÃ£o por
--- conta. Como um pedido do Mercado Livre tem SEMPRE duas pontas â€” o comprador
--- e o vendedor â€” assim que as duas conectam o app, a segunda a sincronizar
+-- Efeito colateral: aquele UNIQUE passou a valer para a tabela toda, e nÃƒÂ£o por
+-- conta. Como um pedido do Mercado Livre tem SEMPRE duas pontas Ã¢â‚¬â€ o comprador
+-- e o vendedor Ã¢â‚¬â€ assim que as duas conectam o app, a segunda a sincronizar
 -- esbarra na linha da primeira.
 --
--- NÃ£o Ã© caso raro: Ã© o funcionamento normal de um marketplace.
+-- NÃƒÂ£o ÃƒÂ© caso raro: ÃƒÂ© o funcionamento normal de um marketplace.
 --
--- A CORREÃ‡ÃƒO
+-- A CORREÃƒâ€¡ÃƒÆ’O
 -- Remover o UNIQUE global da coluna legada. A unicidade correta,
--- UNIQUE (account_id, ml_order_id), jÃ¡ existe desde 20260813120000 e continua
--- valendo â€” cada conta segue com no mÃ¡ximo uma linha por pedido.
+-- UNIQUE (account_id, ml_order_id), jÃƒÂ¡ existe desde 20260813120000 e continua
+-- valendo Ã¢â‚¬â€ cada conta segue com no mÃƒÂ¡ximo uma linha por pedido.
 --
--- Nenhuma coluna Ã© removida, nenhum dado Ã© apagado, o gatilho continua
+-- Nenhuma coluna ÃƒÂ© removida, nenhum dado ÃƒÂ© apagado, o gatilho continua
 -- espelhando o valor para quem ainda consulta a coluna antiga.
 -- ============================================================================
 
@@ -66,7 +66,7 @@ BEGIN
     RAISE NOTICE 'Removida a restricao global %', nome;
   END LOOP;
 
-  -- Ãndices Ãºnicos soltos sobre order_id (sem constraint por trÃ¡s).
+  -- ÃƒÂndices ÃƒÂºnicos soltos sobre order_id (sem constraint por trÃƒÂ¡s).
   FOR nome IN
     SELECT i.relname
       FROM pg_index     idx
@@ -93,45 +93,45 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS ml_orders_conta_pedido_uidx
   ON public.ml_orders (account_id, ml_order_id);
 
--- Consulta pela coluna legada continua rÃ¡pida, agora sem exigir unicidade.
+-- Consulta pela coluna legada continua rÃƒÂ¡pida, agora sem exigir unicidade.
 CREATE INDEX IF NOT EXISTS ml_orders_order_id_idx ON public.ml_orders (order_id);
 
 NOTIFY pgrst, 'reload schema';
 
 
 -- ============================================================================
--- PARTE 2 — NOTIFICACOES DO MERCADO LIVRE
+-- PARTE 2 â€” NOTIFICACOES DO MERCADO LIVRE
 -- ============================================================================
 
 -- ============================================================================
--- NOTIFICAÃ‡Ã•ES COMPLETAS â€” todos os tÃ³picos do Mercado Livre passam a ter
--- destino no banco. Execute no SQL Editor do Supabase APÃ“S
+-- NOTIFICAÃƒâ€¡Ãƒâ€¢ES COMPLETAS Ã¢â‚¬â€ todos os tÃƒÂ³picos do Mercado Livre passam a ter
+-- destino no banco. Execute no SQL Editor do Supabase APÃƒâ€œS
 -- 20260815160000_refresh_automatico.sql.
 -- ============================================================================
 --
--- 100% ADITIVA e IDEMPOTENTE. Nenhuma tabela existente Ã© alterada de forma
--- destrutiva, nenhuma coluna Ã© removida ou renomeada, nenhum dado Ã© apagado.
+-- 100% ADITIVA e IDEMPOTENTE. Nenhuma tabela existente ÃƒÂ© alterada de forma
+-- destrutiva, nenhuma coluna ÃƒÂ© removida ou renomeada, nenhum dado ÃƒÂ© apagado.
 --
 -- POR QUE ESTAS TABELAS EXISTEM
--- AtÃ© aqui sÃ³ pedidos e envios eram gravados. Os demais tÃ³picos (pagamentos,
--- mensagens, anÃºncios, perguntas, reclamaÃ§Ãµes, preÃ§os, promoÃ§Ãµes, leads...)
--- chegavam no webhook e viravam apenas uma linha de log â€” o conteÃºdo se perdia.
+-- AtÃƒÂ© aqui sÃƒÂ³ pedidos e envios eram gravados. Os demais tÃƒÂ³picos (pagamentos,
+-- mensagens, anÃƒÂºncios, perguntas, reclamaÃƒÂ§ÃƒÂµes, preÃƒÂ§os, promoÃƒÂ§ÃƒÂµes, leads...)
+-- chegavam no webhook e viravam apenas uma linha de log Ã¢â‚¬â€ o conteÃƒÂºdo se perdia.
 --
 -- O DESENHO
---   - TÃ³picos de alto valor ganham tabela prÃ³pria, com colunas consultÃ¡veis:
+--   - TÃƒÂ³picos de alto valor ganham tabela prÃƒÂ³pria, com colunas consultÃƒÂ¡veis:
 --     ml_payments, ml_messages, ml_items, ml_questions, ml_claims,
 --     ml_claim_actions, ml_order_feedback.
---   - A "cauda longa" (preÃ§os, catÃ¡logo, promoÃ§Ãµes, leads, estoque, notas
+--   - A "cauda longa" (preÃƒÂ§os, catÃƒÂ¡logo, promoÃƒÂ§ÃƒÂµes, leads, estoque, notas
 --     fiscais...) cai em ml_topic_events: uma linha por recurso notificado,
 --     com o corpo lido da API em jsonb. Nada se perde e, quando um desses
---     tÃ³picos merecer tabela prÃ³pria, os dados jÃ¡ estarÃ£o ali para migrar.
+--     tÃƒÂ³picos merecer tabela prÃƒÂ³pria, os dados jÃƒÂ¡ estarÃƒÂ£o ali para migrar.
 --
--- O histÃ³rico bruto de TODA notificaÃ§Ã£o continua em ml_webhook_events â€” estas
--- tabelas guardam o CONTEÃšDO, nÃ£o substituem o registro de recebimento.
+-- O histÃƒÂ³rico bruto de TODA notificaÃƒÂ§ÃƒÂ£o continua em ml_webhook_events Ã¢â‚¬â€ estas
+-- tabelas guardam o CONTEÃƒÅ¡DO, nÃƒÂ£o substituem o registro de recebimento.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 1) Pagamentos  (tÃ³picos: payments, orders_v2 -> o.payments[])
+-- 1) Pagamentos  (tÃƒÂ³picos: payments, orders_v2 -> o.payments[])
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.ml_payments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -165,7 +165,7 @@ CREATE INDEX IF NOT EXISTS ml_payments_order_idx    ON public.ml_payments (ml_or
 CREATE INDEX IF NOT EXISTS ml_payments_status_idx   ON public.ml_payments (account_id, status);
 
 -- ----------------------------------------------------------------------------
--- 2) Mensagens pÃ³s-venda  (tÃ³picos: messages, messages_created, messages_read)
+-- 2) Mensagens pÃƒÂ³s-venda  (tÃƒÂ³picos: messages, messages_created, messages_read)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.ml_messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS public.ml_messages (
   ml_order_id text,
   from_user_id text,
   to_user_id text,
-  -- 'recebida' quando quem escreveu nÃ£o Ã© a conta conectada; 'enviada' quando Ã©.
+  -- 'recebida' quando quem escreveu nÃƒÂ£o ÃƒÂ© a conta conectada; 'enviada' quando ÃƒÂ©.
   direcao text,
   subject text,
   body text,
@@ -198,7 +198,7 @@ CREATE INDEX IF NOT EXISTS ml_messages_pack_idx    ON public.ml_messages (accoun
 CREATE INDEX IF NOT EXISTS ml_messages_naolidas_idx ON public.ml_messages (account_id, date_read) WHERE date_read IS NULL;
 
 -- ----------------------------------------------------------------------------
--- 3) AnÃºncios  (tÃ³picos: items, items_prices, user_products_families)
+-- 3) AnÃƒÂºncios  (tÃƒÂ³picos: items, items_prices, user_products_families)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.ml_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -236,7 +236,7 @@ CREATE INDEX IF NOT EXISTS ml_items_account_idx ON public.ml_items (account_id, 
 CREATE INDEX IF NOT EXISTS ml_items_status_idx  ON public.ml_items (account_id, status);
 
 -- ----------------------------------------------------------------------------
--- 4) Perguntas  (tÃ³pico: questions)
+-- 4) Perguntas  (tÃƒÂ³pico: questions)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.ml_questions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -265,7 +265,7 @@ CREATE INDEX IF NOT EXISTS ml_questions_pendentes_idx
   ON public.ml_questions (account_id, date_created DESC) WHERE answer_text IS NULL;
 
 -- ----------------------------------------------------------------------------
--- 5) ReclamaÃ§Ãµes  (tÃ³picos: post_purchase, claims, created_claims)
+-- 5) ReclamaÃƒÂ§ÃƒÂµes  (tÃƒÂ³picos: post_purchase, claims, created_claims)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.ml_claims (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -296,8 +296,8 @@ CREATE INDEX IF NOT EXISTS ml_claims_account_idx ON public.ml_claims (account_id
 CREATE INDEX IF NOT EXISTS ml_claims_order_idx   ON public.ml_claims (account_id, ml_order_id);
 CREATE INDEX IF NOT EXISTS ml_claims_abertas_idx ON public.ml_claims (account_id, status) WHERE status <> 'closed';
 
--- AÃ§Ãµes disponÃ­veis/executadas dentro de uma reclamaÃ§Ã£o (tÃ³pico claims_actions).
--- fingerprint garante idempotÃªncia sem depender de um id que o ML nem sempre manda.
+-- AÃƒÂ§ÃƒÂµes disponÃƒÂ­veis/executadas dentro de uma reclamaÃƒÂ§ÃƒÂ£o (tÃƒÂ³pico claims_actions).
+-- fingerprint garante idempotÃƒÂªncia sem depender de um id que o ML nem sempre manda.
 CREATE TABLE IF NOT EXISTS public.ml_claim_actions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uuid NOT NULL REFERENCES public.ml_connections(id) ON DELETE CASCADE,
@@ -315,7 +315,7 @@ CREATE TABLE IF NOT EXISTS public.ml_claim_actions (
 CREATE INDEX IF NOT EXISTS ml_claim_actions_claim_idx ON public.ml_claim_actions (ml_claim_id);
 
 -- ----------------------------------------------------------------------------
--- 6) Feedback do pedido  (tÃ³pico: orders_feedback)
+-- 6) Feedback do pedido  (tÃƒÂ³pico: orders_feedback)
 --    Uma linha por papel: o comprador e o vendedor avaliam separadamente.
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.ml_order_feedback (
@@ -341,20 +341,20 @@ CREATE TABLE IF NOT EXISTS public.ml_order_feedback (
 CREATE INDEX IF NOT EXISTS ml_order_feedback_account_idx ON public.ml_order_feedback (account_id, date_created DESC);
 
 -- ----------------------------------------------------------------------------
--- 7) Cauda longa dos tÃ³picos  (preÃ§os, catÃ¡logo, promoÃ§Ãµes, leads, estoque,
---    notas fiscais, cotaÃ§Ãµes, flex, seguros, crÃ©ditos de leads...)
+-- 7) Cauda longa dos tÃƒÂ³picos  (preÃƒÂ§os, catÃƒÂ¡logo, promoÃƒÂ§ÃƒÂµes, leads, estoque,
+--    notas fiscais, cotaÃƒÂ§ÃƒÂµes, flex, seguros, crÃƒÂ©ditos de leads...)
 --
---    Uma linha por RECURSO notificado, sempre com o Ãºltimo corpo lido da API.
---    O histÃ³rico de cada chegada continua em ml_webhook_events.
+--    Uma linha por RECURSO notificado, sempre com o ÃƒÂºltimo corpo lido da API.
+--    O histÃƒÂ³rico de cada chegada continua em ml_webhook_events.
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.ml_topic_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uuid NOT NULL REFERENCES public.ml_connections(id) ON DELETE CASCADE,
   provider text NOT NULL DEFAULT 'mercado_livre',
-  topic text NOT NULL,            -- tÃ³pico exatamente como o ML enviou
-  topic_key text NOT NULL,        -- chave canÃ´nica do catÃ¡logo (ml-topics.server.ts)
+  topic text NOT NULL,            -- tÃƒÂ³pico exatamente como o ML enviou
+  topic_key text NOT NULL,        -- chave canÃƒÂ´nica do catÃƒÂ¡logo (ml-topics.server.ts)
   topic_group text NOT NULL,      -- prices | items | catalog | promotions | vis_leads | shipments | others
-  label text,                     -- rÃ³tulo em portuguÃªs, para a tela
+  label text,                     -- rÃƒÂ³tulo em portuguÃƒÂªs, para a tela
   resource text NOT NULL,
   resource_id text,
   ml_user_id text,
@@ -362,7 +362,7 @@ CREATE TABLE IF NOT EXISTS public.ml_topic_events (
   http_status integer,
   fetch_error text,
   payload jsonb,                  -- corpo do recurso lido na API
-  summary text,                   -- resumo legÃ­vel montado pelo backend
+  summary text,                   -- resumo legÃƒÂ­vel montado pelo backend
   occurred_at timestamptz,
   times_seen integer NOT NULL DEFAULT 1,
   first_seen_at timestamptz NOT NULL DEFAULT now(),
@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS ml_topic_events_group_idx   ON public.ml_topic_events
 CREATE INDEX IF NOT EXISTS ml_topic_events_key_idx     ON public.ml_topic_events (topic_key);
 
 -- ----------------------------------------------------------------------------
--- 8) updated_at automÃ¡tico (public.touch_updated_at jÃ¡ existe)
+-- 8) updated_at automÃƒÂ¡tico (public.touch_updated_at jÃƒÂ¡ existe)
 -- ----------------------------------------------------------------------------
 DO $$
 DECLARE t text;
@@ -393,8 +393,8 @@ BEGIN
 END $$;
 
 -- ----------------------------------------------------------------------------
--- 9) RLS â€” mesmo modelo das tabelas existentes:
---    service_role faz tudo; o dono da conta e o admin leem; anon nÃ£o vÃª nada.
+-- 9) RLS Ã¢â‚¬â€ mesmo modelo das tabelas existentes:
+--    service_role faz tudo; o dono da conta e o admin leem; anon nÃƒÂ£o vÃƒÂª nada.
 -- ----------------------------------------------------------------------------
 DO $$
 DECLARE t text;
@@ -428,31 +428,31 @@ NOTIFY pgrst, 'reload schema';
 
 
 -- ============================================================================
--- PARTE 3 — PERFIL DO CLIENTE
+-- PARTE 3 â€” PERFIL DO CLIENTE
 -- ============================================================================
 
 -- ============================================================================
--- PERFIL DO CLIENTE â€” nome, telefone, CPF e PIN de atendimento.
--- Execute no SQL Editor do Supabase APÃ“S
+-- PERFIL DO CLIENTE Ã¢â‚¬â€ nome, telefone, CPF e PIN de atendimento.
+-- Execute no SQL Editor do Supabase APÃƒâ€œS
 -- 20260818120000_notificacoes_completas.sql.
 -- ============================================================================
 --
--- 100% ADITIVA. Nenhuma tabela existente Ã© tocada.
+-- 100% ADITIVA. Nenhuma tabela existente ÃƒÂ© tocada.
 --
 -- O QUE ESTA TABELA GUARDA
--- O Supabase Auth jÃ¡ cuida do e-mail e da senha. O que falta Ã© o cadastro
--- comercial do cliente â€” quem Ã© a pessoa por trÃ¡s do login â€” para o
+-- O Supabase Auth jÃƒÂ¡ cuida do e-mail e da senha. O que falta ÃƒÂ© o cadastro
+-- comercial do cliente Ã¢â‚¬â€ quem ÃƒÂ© a pessoa por trÃƒÂ¡s do login Ã¢â‚¬â€ para o
 -- atendimento identificar, emitir nota e localizar pedidos.
 --
--- O QUE ELA NÃƒO GUARDA
--- Senha. A senha vive sÃ³ no auth.users do Supabase, em hash, e nem o
--- administrador consegue lÃª-la. O PIN tambÃ©m NÃƒO Ã© gravado em claro: sÃ³ o
+-- O QUE ELA NÃƒÆ’O GUARDA
+-- Senha. A senha vive sÃƒÂ³ no auth.users do Supabase, em hash, e nem o
+-- administrador consegue lÃƒÂª-la. O PIN tambÃƒÂ©m NÃƒÆ’O ÃƒÂ© gravado em claro: sÃƒÂ³ o
 -- hash scrypt, calculado no servidor (src/lib/server/perfil.server.ts).
 --
 -- LGPD
--- CPF Ã© dado pessoal. A CentralML mostra mascarado (123.***.**9-00) por
--- padrÃ£o, e toda revelaÃ§Ã£o do valor completo passa pela auditoria em
--- admin_audit_log. A regra abaixo garante que ninguÃ©m alÃ©m do dono e do
+-- CPF ÃƒÂ© dado pessoal. A CentralML mostra mascarado (123.***.**9-00) por
+-- padrÃƒÂ£o, e toda revelaÃƒÂ§ÃƒÂ£o do valor completo passa pela auditoria em
+-- admin_audit_log. A regra abaixo garante que ninguÃƒÂ©m alÃƒÂ©m do dono e do
 -- administrador consiga ler estas linhas.
 -- ============================================================================
 
@@ -460,8 +460,8 @@ CREATE TABLE IF NOT EXISTS public.clientes_perfil (
   user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   nome_completo text NOT NULL,
   email text,
-  telefone text NOT NULL,           -- sÃ³ dÃ­gitos, com DDD
-  cpf text NOT NULL,                -- sÃ³ dÃ­gitos, 11 posiÃ§Ãµes
+  telefone text NOT NULL,           -- sÃƒÂ³ dÃƒÂ­gitos, com DDD
+  cpf text NOT NULL,                -- sÃƒÂ³ dÃƒÂ­gitos, 11 posiÃƒÂ§ÃƒÂµes
   pin_hash text,                    -- scrypt "salt:hash". NUNCA o PIN em claro.
   criado_em timestamptz NOT NULL DEFAULT now(),
   atualizado_em timestamptz NOT NULL DEFAULT now(),
@@ -481,8 +481,8 @@ ALTER TABLE public.clientes_perfil ADD CONSTRAINT clientes_perfil_cpf_formato CH
 ALTER TABLE public.clientes_perfil DROP CONSTRAINT IF EXISTS clientes_perfil_telefone_formato;
 ALTER TABLE public.clientes_perfil ADD CONSTRAINT clientes_perfil_telefone_formato CHECK (telefone ~ '^[0-9]{10,13}$');
 
--- atualizado_em automÃ¡tico (public.touch_updated_at usa a coluna updated_at,
--- entÃ£o esta tabela tem gatilho prÃ³prio).
+-- atualizado_em automÃƒÂ¡tico (public.touch_updated_at usa a coluna updated_at,
+-- entÃƒÂ£o esta tabela tem gatilho prÃƒÂ³prio).
 CREATE OR REPLACE FUNCTION public.touch_clientes_perfil()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -495,8 +495,8 @@ CREATE TRIGGER clientes_perfil_touch BEFORE UPDATE ON public.clientes_perfil
   FOR EACH ROW EXECUTE FUNCTION public.touch_clientes_perfil();
 
 -- ----------------------------------------------------------------------------
--- RLS â€” o cliente lÃª e edita SÃ“ o prÃ³prio perfil; o admin lÃª todos;
---       anon nÃ£o enxerga nada. Escrita sempre pelo backend (service_role).
+-- RLS Ã¢â‚¬â€ o cliente lÃƒÂª e edita SÃƒâ€œ o prÃƒÂ³prio perfil; o admin lÃƒÂª todos;
+--       anon nÃƒÂ£o enxerga nada. Escrita sempre pelo backend (service_role).
 -- ----------------------------------------------------------------------------
 ALTER TABLE public.clientes_perfil ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.clientes_perfil TO service_role;
@@ -510,6 +510,64 @@ CREATE POLICY "clientes_perfil leitura dono ou admin" ON public.clientes_perfil
 
 DROP POLICY IF EXISTS "clientes_perfil sem acesso anon" ON public.clientes_perfil;
 CREATE POLICY "clientes_perfil sem acesso anon" ON public.clientes_perfil
+  FOR ALL TO anon USING (false) WITH CHECK (false);
+
+NOTIFY pgrst, 'reload schema';
+
+-- ============================================================================
+-- PARTE 4 - BLOQUEIO DE CLIENTES
+-- ============================================================================
+
+-- ============================================================================
+-- BLOQUEIO DE CLIENTES â€” o administrador tira o acesso de alguÃ©m ao Ãšnific+.
+-- Execute no SQL Editor do Supabase.
+-- ============================================================================
+--
+-- 100% ADITIVA. Uma tabela nova, nada existente Ã© tocado.
+--
+-- POR QUE UMA TABELA SEPARADA, E NÃƒO UMA COLUNA EM clientes_perfil
+-- `clientes_perfil` sÃ³ tem linha para quem se cadastrou pelo formulÃ¡rio novo
+-- (nome, telefone, CPF, PIN). Clientes antigos nÃ£o tÃªm perfil nenhum â€” e sÃ£o
+-- justamente os que mais podem precisar ser bloqueados.
+--
+-- Aqui a chave Ã© o usuÃ¡rio do Auth. Funciona para TODO mundo que consegue
+-- entrar, com perfil ou sem.
+--
+-- O bloqueio Ã© reversÃ­vel: desbloquear Ã© apagar a linha.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.clientes_bloqueados (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email text,
+  motivo text,
+  bloqueado_em timestamptz NOT NULL DEFAULT now(),
+  -- E-mail do administrador que bloqueou. Fica aqui alÃ©m da auditoria para a
+  -- tela conseguir mostrar quem foi sem uma segunda consulta.
+  bloqueado_por text
+);
+
+CREATE INDEX IF NOT EXISTS clientes_bloqueados_em_idx ON public.clientes_bloqueados (bloqueado_em DESC);
+CREATE INDEX IF NOT EXISTS clientes_bloqueados_email_idx ON public.clientes_bloqueados (lower(email));
+
+-- ----------------------------------------------------------------------------
+-- RLS â€” sÃ³ o backend escreve; sÃ³ o admin lÃª.
+--
+-- O cliente bloqueado NÃƒO precisa (nem deve) ler esta tabela: quem informa o
+-- bloqueio a ele Ã© o servidor, na resposta. Deixar a lista legÃ­vel entregaria
+-- de graÃ§a quem mais estÃ¡ bloqueado.
+-- ----------------------------------------------------------------------------
+ALTER TABLE public.clientes_bloqueados ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.clientes_bloqueados TO service_role;
+GRANT SELECT ON public.clientes_bloqueados TO authenticated;
+REVOKE ALL ON public.clientes_bloqueados FROM anon;
+
+DROP POLICY IF EXISTS "clientes_bloqueados leitura admin" ON public.clientes_bloqueados;
+CREATE POLICY "clientes_bloqueados leitura admin" ON public.clientes_bloqueados
+  FOR SELECT TO authenticated
+  USING (public.is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS "clientes_bloqueados sem acesso anon" ON public.clientes_bloqueados;
+CREATE POLICY "clientes_bloqueados sem acesso anon" ON public.clientes_bloqueados
   FOR ALL TO anon USING (false) WITH CHECK (false);
 
 NOTIFY pgrst, 'reload schema';
