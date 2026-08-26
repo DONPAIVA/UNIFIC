@@ -50,7 +50,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { adminBloquearCliente, adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
-import { adminAoVivo, registrarTentativaPainel } from "@/lib/monitor.functions";
+import { adminAoVivo, adminBloquearIp, adminIpsBloqueados, registrarTentativaPainel } from "@/lib/monitor.functions";
 import { formatarCpf, formatarTelefone, mascararCpf } from "@/lib/cpf";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -1858,11 +1858,37 @@ function SincronizacoesTab({ accountId }: { accountId: string | null }) {
  */
 function AoVivoTab() {
   const { data, loading, error, reload } = useAsync(["ao-vivo"], () => adminAoVivo());
+  const ips = useAsync(["ips-bloqueados"], () => adminIpsBloqueados());
 
   useEffect(() => {
     const t = setInterval(reload, 10_000);
     return () => clearInterval(t);
   }, [reload]);
+
+  const bloquearIp = async (ip: string) => {
+    if (!ip || ip === "—") return;
+    if (!confirm(`Bloquear o endereço ${ip}?\n\nQuem estiver nele deixa de acessar o site, mesmo sem conta.\n\nCuidado: um IP pode ser compartilhado por um prédio ou por uma operadora de celular — outras pessoas podem ser barradas junto.`)) return;
+    const motivo = prompt("Motivo (opcional):") ?? "";
+    try {
+      await adminBloquearIp({ data: { ip, bloquear: true, motivo } });
+      reload();
+      ips.reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Não foi possível bloquear.");
+    }
+  };
+
+  const liberarIp = async (ip: string) => {
+    try {
+      await adminBloquearIp({ data: { ip, bloquear: false } });
+      ips.reload();
+      reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Não foi possível liberar.");
+    }
+  };
+
+  const ipsBarrados = new Set((ips.data?.ips ?? []).map((i: any) => String(i.ip)));
 
   const desde = (iso: string) => {
     const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -1913,7 +1939,7 @@ function AoVivoTab() {
             {data.online.length === 0 ? (
               <Empty>Ninguém com o site aberto neste momento.</Empty>
             ) : (
-              <Table head={["Quem", "Onde está", "IP", "Navegador", "Há quanto tempo", "Visto"]}>
+              <Table head={["Quem", "Onde está", "IP", "Navegador", "Há quanto tempo", "Visto", "Ação"]}>
                 {data.online.map((o: any) => (
                   <tr key={o.sessaoId} className={`border-t border-zinc-100 ${o.noPainel ? "bg-amber-50/70" : ""}`}>
                     <td className="px-2 py-2 text-xs font-semibold">
@@ -1934,6 +1960,20 @@ function AoVivoTab() {
                     <td className="px-2 py-2 text-xs">{o.navegador}</td>
                     <td className="px-2 py-2 text-xs">{desde(o.desde)}</td>
                     <td className="px-2 py-2 text-xs text-zinc-500">há {desde(o.visto)}</td>
+                    <td className="px-2 py-2 text-xs">
+                      {o.ip && !ipsBarrados.has(String(o.ip)) ? (
+                        <button
+                          onClick={() => void bloquearIp(String(o.ip))}
+                          className="rounded-lg bg-red-100 px-2 py-1 text-[11px] font-bold text-red-700 hover:bg-red-200"
+                        >
+                          Bloquear IP
+                        </button>
+                      ) : o.ip ? (
+                        <span className="text-[11px] font-bold text-red-600">bloqueado</span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                   </tr>
                 ))}
               </Table>
@@ -1948,7 +1988,7 @@ function AoVivoTab() {
         ) : data.tentativas.length === 0 ? (
           <Empty>Nenhuma tentativa registrada ainda.</Empty>
         ) : (
-          <Table head={["Quando", "E-mail", "Resultado", "IP", "Navegador"]}>
+          <Table head={["Quando", "E-mail", "Resultado", "IP", "Navegador", "Ação"]}>
             {data.tentativas.map((t: any) => (
               <tr key={t.id} className={`border-t border-zinc-100 ${t.sucesso ? "" : "bg-red-50/60"}`}>
                 <td className="px-2 py-2 text-xs">{fmtDateTime(t.quando)}</td>
@@ -1962,6 +2002,65 @@ function AoVivoTab() {
                 </td>
                 <td className="px-2 py-2 font-mono text-xs">{t.ip || "—"}</td>
                 <td className="px-2 py-2 text-xs">{t.navegador}</td>
+                <td className="px-2 py-2 text-xs">
+                  {t.ip && !ipsBarrados.has(String(t.ip)) && !t.sucesso ? (
+                    <button
+                      onClick={() => void bloquearIp(String(t.ip))}
+                      className="rounded-lg bg-red-100 px-2 py-1 text-[11px] font-bold text-red-700 hover:bg-red-200"
+                    >
+                      Bloquear IP
+                    </button>
+                  ) : t.ip && ipsBarrados.has(String(t.ip)) ? (
+                    <span className="text-[11px] font-bold text-red-600">bloqueado</span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </Panel>
+
+      <Panel
+        title={`Endereços bloqueados${ips.data ? ` (${ips.data.ips.length})` : ""}`}
+        right={
+          <button
+            onClick={() => {
+              const ip = prompt("IP a bloquear (ex.: 203.0.113.45):")?.trim();
+              if (ip) void bloquearIp(ip);
+            }}
+            className="rounded-lg bg-zinc-100 px-2 py-1 text-[11px] font-bold text-zinc-700 hover:bg-zinc-200"
+          >
+            + Bloquear um IP
+          </button>
+        }
+      >
+        {!ips.data || ips.data.ips.length === 0 ? (
+          <Empty>Nenhum endereço bloqueado.</Empty>
+        ) : (
+          <Table head={["IP", "Motivo", "Bloqueado em", "Por", "Tentou depois", "Ação"]}>
+            {ips.data.ips.map((i: any) => (
+              <tr key={i.ip} className="border-t border-zinc-100">
+                <td className="px-2 py-2 font-mono text-xs font-semibold">{i.ip}</td>
+                <td className="px-2 py-2 text-xs">{i.motivo || "—"}</td>
+                <td className="px-2 py-2 text-xs">{fmtDateTime(i.bloqueado_em)}</td>
+                <td className="px-2 py-2 text-xs">{i.bloqueado_por || "—"}</td>
+                <td className="px-2 py-2 text-xs">
+                  {i.tentativas_apos > 0 ? (
+                    <span className="font-bold text-amber-700">{i.tentativas_apos}x</span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="px-2 py-2 text-xs">
+                  <button
+                    onClick={() => void liberarIp(String(i.ip))}
+                    className="rounded-lg bg-emerald-100 px-2 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-200"
+                  >
+                    Liberar
+                  </button>
+                </td>
               </tr>
             ))}
           </Table>

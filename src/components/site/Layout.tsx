@@ -6,6 +6,7 @@ import { Header } from "./Header";
 import { Footer, HelpBand } from "./Sections";
 import { Mascot } from "./Mascot";
 import { meuAcesso } from "@/lib/perfil.functions";
+import { verificarIp } from "@/lib/monitor.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -59,6 +60,21 @@ export function Layout({ children }: { children: ReactNode }) {
     retry: false,
   });
 
+  /*
+   * Bloqueio por endereço. Vale para visitante ANÔNIMO também — é o único jeito
+   * de barrar quem não tem conta, como alguém tentando adivinhar a senha do
+   * painel ou voltando com cadastro novo.
+   */
+  const ip = useQuery({
+    queryKey: ["meu-ip"],
+    queryFn: () => verificarIp(),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  if (ip.data?.bloqueado) {
+    return <ContaBloqueada motivo={ip.data.motivo ?? null} />;
+  }
   if (acesso.data?.bloqueado) {
     return <ContaBloqueada motivo={acesso.data.motivo ?? null} />;
   }

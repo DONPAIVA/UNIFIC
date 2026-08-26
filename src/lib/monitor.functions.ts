@@ -102,6 +102,109 @@ export const registrarTentativaPainel = createServerFn({ method: "POST" })
   });
 
 /* -------------------------------------------------------------------------- */
+/* Bloqueio por IP                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Este endereço está barrado?
+ *
+ * Consultado pelo Layout a cada carregamento. Barra visitante anônimo também —
+ * é justamente para quem não tem conta que o bloqueio por IP existe.
+ *
+ * Aproveita para contar as batidas na porta: saber que um IP bloqueado voltou
+ * 40 vezes é informação diferente de saber que ele desistiu.
+ */
+export const verificarIp = createServerFn({ method: "GET" }).handler(async () => {
+  const { getRequest } = await import("@tanstack/react-start/server");
+  const { db } = await import("./server/db.server");
+  const { ipDeHeaders } = await import("./server/ip.server");
+
+  const ip = ipDeHeaders(getRequest().headers);
+  if (!ip) return { bloqueado: false, motivo: null as string | null };
+
+  const { data } = await db("ips_bloqueados").select("ip, motivo, tentativas_apos").eq("ip", ip).maybeSingle();
+  if (!data) return { bloqueado: false, motivo: null as string | null };
+
+  try {
+    await db("ips_bloqueados")
+      .update({
+        tentativas_apos: Number((data as any).tentativas_apos ?? 0) + 1,
+        ultima_tentativa_em: new Date().toISOString(),
+      })
+      .eq("ip", ip);
+  } catch {
+    /* contador é informativo */
+  }
+
+  return { bloqueado: true, motivo: ((data as any).motivo as string) ?? null };
+});
+
+/** Lista os IPs barrados, para a aba Ao vivo. */
+export const adminIpsBloqueados = createServerFn({ method: "GET" })
+  .middleware([requireAdminUser])
+  .handler(async () => {
+    const { admin } = await import("./server/db.server");
+    const { data } = await admin
+      .from("ips_bloqueados")
+      .select("ip, motivo, bloqueado_em, bloqueado_por, tentativas_apos, ultima_tentativa_em")
+      .order("bloqueado_em", { ascending: false })
+      .limit(200);
+    return { ips: data ?? [] };
+  });
+
+/** Bloqueia ou libera um endereço. */
+export const adminBloquearIp = createServerFn({ method: "POST" })
+  .middleware([requireAdminUser])
+  .inputValidator((input: { ip: string; bloquear: boolean; motivo?: string }) => ({
+    ip: String(input?.ip ?? "").trim().slice(0, 60),
+    bloquear: Boolean(input?.bloquear),
+    motivo: String(input?.motivo ?? "").trim().slice(0, 300),
+  }))
+  .handler(async ({ data, context }) => {
+    if (!data.ip) throw new Error("IP não informado.");
+
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const { db } = await import("./server/db.server");
+    const { ipDeHeaders } = await import("./server/ip.server");
+    const { logAudit } = await import("./server/audit.server");
+
+    // Trancar-se para fora do próprio painel é um erro sem volta pela tela.
+    const meuIp = ipDeHeaders(getRequest().headers);
+    if (data.bloquear && meuIp && meuIp === data.ip) {
+      throw new Error("Este é o SEU endereço agora. Bloqueá-lo tiraria o seu próprio acesso.");
+    }
+
+    if (data.bloquear) {
+      const { error } = await db("ips_bloqueados").upsert(
+        {
+          ip: data.ip,
+          motivo: data.motivo || null,
+          bloqueado_em: new Date().toISOString(),
+          bloqueado_por: context.user.email,
+        },
+        { onConflict: "ip" },
+      );
+      if (error) throw new Error(`Não foi possível bloquear: ${error.message}`);
+    } else {
+      const { error } = await db("ips_bloqueados").delete().eq("ip", data.ip);
+      if (error) throw new Error(`Não foi possível liberar: ${error.message}`);
+    }
+
+    await logAudit({
+      adminUserId: context.user.userId,
+      adminEmail: context.user.email,
+      ip: context.user.ip,
+      action: data.bloquear ? "ip.bloqueado" : "ip.liberado",
+      entity: "ips_bloqueados",
+      entityId: data.ip,
+      success: true,
+      detail: { motivo: data.motivo || null },
+    });
+
+    return { ok: true, bloqueado: data.bloquear };
+  });
+
+/* -------------------------------------------------------------------------- */
 /* Leitura (somente administrador)                                             */
 /* -------------------------------------------------------------------------- */
 
