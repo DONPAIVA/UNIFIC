@@ -521,13 +521,56 @@ export const adminOrder = createServerFn({ method: "GET" })
     };
 
     if (packId && vendedorId) {
-      const m = await mlFetch(
-        conta,
-        `/messages/packs/${packId}/sellers/${vendedorId}?tag=post_sale&mark_as_read=false`,
-        { actor: ator },
-      );
-      if (m.ok) {
-        const msgs: any[] = (m.data as any)?.messages ?? [];
+      /*
+       * A conversa vem PAGINADA. Sem `limit`/`offset` o Mercado Livre devolve
+       * só a primeira página, e as mensagens antigas simplesmente somem da
+       * tela — dá a impressão de que a conversa foi apagada.
+       *
+       * Aqui percorremos todas as páginas e montamos o histórico do começo ao
+       * fim. O teto de 20 voltas (2000 mensagens) evita laço infinito se o ML
+       * devolver paginação estranha.
+       */
+      const PAGINA = 100;
+      const todas: any[] = [];
+      let offset = 0;
+      let ultimoStatus = 0;
+      let algumaPaginaOk = false;
+
+      for (let volta = 0; volta < 20; volta++) {
+        const r = await mlFetch(
+          conta,
+          `/messages/packs/${packId}/sellers/${vendedorId}?tag=post_sale&mark_as_read=false&limit=${PAGINA}&offset=${offset}`,
+          { actor: ator },
+        );
+        ultimoStatus = r.status;
+        if (!r.ok) break;
+        algumaPaginaOk = true;
+        const lote: any[] = (r.data as any)?.messages ?? [];
+        todas.push(...lote);
+        if (lote.length < PAGINA) break;
+        offset += PAGINA;
+      }
+
+      if (algumaPaginaOk) {
+        // Ordem cronológica: a API não garante, e conversa fora de ordem
+        // confunde mais que conversa incompleta.
+        const msgs: any[] = todas.sort((a, b) => {
+          const da = new Date(a?.message_date?.created ?? 0).getTime();
+          const db2 = new Date(b?.message_date?.created ?? 0).getTime();
+          return da - db2;
+        });
+
+        /*
+         * Guarda no banco. A partir daí o histórico deixa de depender do que o
+         * Mercado Livre resolve devolver: mensagem lida uma vez fica gravada.
+         */
+        try {
+          const { salvarMensagens } = await import("./server/ml-topics.server");
+          await salvarMensagens(conta, msgs, { packId: String(packId) });
+        } catch {
+          /* histórico é complemento; nunca derruba a tela do pedido */
+        }
+
         conversa = {
           disponivel: true,
           motivo: "",
@@ -548,8 +591,8 @@ export const adminOrder = createServerFn({ method: "GET" })
         conversa = {
           disponivel: false,
           motivo: semEnvio
-            ? `Sem conversa (HTTP ${m.status}). Este pedido é sem envio — o Mercado Livre nem sempre abre canal nesse caso.`
-            : `O Mercado Livre respondeu ${m.status} para a conversa deste pedido.`,
+            ? `Sem conversa (HTTP ${ultimoStatus}). Este pedido é sem envio — o Mercado Livre nem sempre abre canal nesse caso.`
+            : `O Mercado Livre respondeu ${ultimoStatus} para a conversa deste pedido.`,
           mensagens: null,
           naoLidas: 0,
         };

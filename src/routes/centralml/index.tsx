@@ -358,8 +358,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
         className="w-full max-w-[22rem] rounded-3xl border border-white/12 bg-black/75 p-7 shadow-2xl backdrop-blur-md sm:p-8"
       >
         <div className="flex flex-col items-center text-center">
-          <LogoML className="h-16 w-16 drop-shadow-lg" />
-          <h1 className="mt-5 text-sm font-black uppercase tracking-[0.22em] text-white">Acesso restrito</h1>
+          <h1 className="text-base font-black uppercase tracking-[0.2em] text-white">Olho de Deus ML</h1>
           <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">
             Painel do Mercado Livre
           </p>
@@ -442,15 +441,9 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
         </button>
 
         <div className="mt-8 border-t border-white/10 pt-5 text-center">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/70">
-            Únific+ · Olho de Deus
-          </p>
-          <p className="mt-1.5 flex items-center justify-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-400/80">
+          <p className="flex items-center justify-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-400/80">
             <ShieldCheck className="h-3 w-3" />
             Sistema protegido e monitorado
-          </p>
-          <p className="mt-3 text-[10px] leading-relaxed text-white/30">
-            A permissão é validada no servidor. Um login válido sem cadastro em admin_users continua bloqueado.
           </p>
         </div>
       </form>
