@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { MatrixBackground } from "@/components/site/MatrixBackground";
+import { usePresenca } from "@/lib/usePresenca";
 
 function NotFoundComponent() {
   return (
@@ -137,6 +138,9 @@ function RootComponent() {
    */
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const ehPainel = pathname.startsWith("/centralml");
+
+  // Batida de presença do site inteiro — alimenta a aba "Ao vivo" do painel.
+  usePresenca();
 
   return (
     <QueryClientProvider client={queryClient}>

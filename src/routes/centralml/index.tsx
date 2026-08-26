@@ -50,6 +50,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { adminBloquearCliente, adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
+import { adminAoVivo, registrarTentativaPainel } from "@/lib/monitor.functions";
 import { formatarCpf, formatarTelefone, mascararCpf } from "@/lib/cpf";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -312,8 +313,24 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const alvo = email.trim();
+    const { error: authError } = await supabase.auth.signInWithPassword({ email: alvo, password });
     setBusy(false);
+
+    /*
+     * Toda tentativa é registrada — acerto e erro.
+     *
+     * O login acontece aqui no navegador, contra o Supabase. Sem esta chamada
+     * o servidor nunca saberia de uma sequência de senhas erradas, e a aba
+     * "Ao vivo" não teria como mostrar quem está tentando entrar.
+     *
+     * Nunca envia a senha. E falhar em registrar não pode impedir o login de
+     * quem tem a credencial certa.
+     */
+    void registrarTentativaPainel({
+      data: { email: alvo, sucesso: !authError, motivo: authError ? "senha_errada" : "ok" },
+    }).catch(() => {});
+
     if (authError) {
       setError(authError.message);
       return;
@@ -458,6 +475,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
 type TabId =
   | "dashboard"
   | "contas"
+  | "aovivo"
   | "clientes"
   | "pedidos"
   | "rastreamentos"
@@ -484,6 +502,7 @@ const TABS: Array<{
 }> = [
   { id: "dashboard", label: "Dashboard", icon: Activity, grupo: "Visão geral" },
   { id: "contas", label: "Contas", icon: Users, grupo: "Visão geral" },
+  { id: "aovivo", label: "Ao vivo", icon: Activity, grupo: "Visão geral" },
   { id: "clientes", label: "Clientes", icon: UserCheck, grupo: "Visão geral" },
 
   { id: "contaml", label: "Conta ML", icon: Globe, grupo: "Mercado Livre" },
@@ -632,6 +651,7 @@ function CentralML() {
           <div className="mt-4 space-y-4 pb-12">
             {tab === "dashboard" && <DashboardTab onOpenAccount={(id) => { setAccountId(id); setTab("contas"); }} />}
             {tab === "contas" && <ContasTab accountId={accountId} onSelect={setAccountId} />}
+            {tab === "aovivo" && <AoVivoTab />}
             {tab === "clientes" && <ClientesTab />}
             {tab === "pedidos" && <PedidosTab accountId={accountId} />}
             {tab === "rastreamentos" && <RastreamentosTab accountId={accountId} />}
@@ -1822,6 +1842,132 @@ function SincronizacoesTab({ accountId }: { accountId: string | null }) {
         </>
       )}
     </Panel>
+  );
+}
+
+/* ========================================================================== */
+/* Ao vivo — quem está no site e quem tenta entrar no painel                  */
+/* ========================================================================== */
+
+/**
+ * Monitor em tempo real.
+ *
+ * Atualiza sozinho a cada 10 s. Considera "online" quem deu sinal nos últimos
+ * 90 s — o navegador bate de 30 em 30, então três batidas perdidas tiram a
+ * pessoa da lista, o que absorve oscilação de rede sem mostrar fantasma.
+ */
+function AoVivoTab() {
+  const { data, loading, error, reload } = useAsync(["ao-vivo"], () => adminAoVivo());
+
+  useEffect(() => {
+    const t = setInterval(reload, 10_000);
+    return () => clearInterval(t);
+  }, [reload]);
+
+  const desde = (iso: string) => {
+    const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+    if (s < 60) return `${s}s`;
+    if (s < 3600) return `${Math.floor(s / 60)}min`;
+    return `${Math.floor(s / 3600)}h`;
+  };
+
+  return (
+    <>
+      {/* Alerta de força bruta primeiro: se existir, é o que importa agora. */}
+      {data?.alertas?.length ? (
+        <Panel title="⚠️ Possível tentativa de invasão">
+          <div className="space-y-2">
+            {data.alertas.map((a: any) => (
+              <div key={a.ip} className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+                <strong className="font-mono">{a.ip}</strong> — {a.falhas} tentativas de login falhas nos últimos 15
+                minutos.
+              </div>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
+
+      <Panel
+        title="Ao vivo"
+        right={
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-zinc-500">atualiza sozinho</span>
+            <button onClick={reload} className="rounded-lg bg-zinc-100 p-1.5 text-zinc-600 hover:bg-zinc-200">
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+        }
+      >
+        {error ? (
+          <ErrorBox message={error} onRetry={reload} />
+        ) : !data ? (
+          <Loading />
+        ) : (
+          <>
+            <div className="mb-4 grid grid-cols-3 gap-3">
+              <Stat label="Online agora" value={data.totalOnline} tone={data.totalOnline > 0 ? "ok" : "default"} />
+              <Stat label="No painel" value={data.noPainel} tone={data.noPainel > 0 ? "alert" : "default"} />
+              <Stat label="Sem conta" value={data.anonimos} />
+            </div>
+
+            {data.online.length === 0 ? (
+              <Empty>Ninguém com o site aberto neste momento.</Empty>
+            ) : (
+              <Table head={["Quem", "Onde está", "IP", "Navegador", "Há quanto tempo", "Visto"]}>
+                {data.online.map((o: any) => (
+                  <tr key={o.sessaoId} className={`border-t border-zinc-100 ${o.noPainel ? "bg-amber-50/70" : ""}`}>
+                    <td className="px-2 py-2 text-xs font-semibold">
+                      {o.quem}
+                      {!o.autenticado && (
+                        <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500">
+                          ANÔNIMO
+                        </span>
+                      )}
+                      {o.noPainel && (
+                        <span className="ml-2 rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+                          NO PAINEL
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-xs">{o.pagina}</td>
+                    <td className="px-2 py-2 font-mono text-xs">{o.ip || "—"}</td>
+                    <td className="px-2 py-2 text-xs">{o.navegador}</td>
+                    <td className="px-2 py-2 text-xs">{desde(o.desde)}</td>
+                    <td className="px-2 py-2 text-xs text-zinc-500">há {desde(o.visto)}</td>
+                  </tr>
+                ))}
+              </Table>
+            )}
+          </>
+        )}
+      </Panel>
+
+      <Panel title="Tentativas de acesso ao painel">
+        {!data ? (
+          <Loading />
+        ) : data.tentativas.length === 0 ? (
+          <Empty>Nenhuma tentativa registrada ainda.</Empty>
+        ) : (
+          <Table head={["Quando", "E-mail", "Resultado", "IP", "Navegador"]}>
+            {data.tentativas.map((t: any) => (
+              <tr key={t.id} className={`border-t border-zinc-100 ${t.sucesso ? "" : "bg-red-50/60"}`}>
+                <td className="px-2 py-2 text-xs">{fmtDateTime(t.quando)}</td>
+                <td className="px-2 py-2 text-xs">{t.email || "—"}</td>
+                <td className="px-2 py-2 text-xs">
+                  {t.sucesso ? (
+                    <span className="font-bold text-emerald-700">entrou</span>
+                  ) : (
+                    <span className="font-bold text-red-700">falhou · {t.motivo}</span>
+                  )}
+                </td>
+                <td className="px-2 py-2 font-mono text-xs">{t.ip || "—"}</td>
+                <td className="px-2 py-2 text-xs">{t.navegador}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </Panel>
+    </>
   );
 }
 
