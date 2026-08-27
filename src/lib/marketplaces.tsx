@@ -116,18 +116,20 @@ const MagaluMark = () => (
   </span>
 );
 
+// Mercado Livre primeiro: é de onde vem a maior parte dos rastreios, e a
+// ordem da lista é a ordem em que os cartões aparecem na tela.
 export const MARKETPLACES: Marketplace[] = [
-  {
-    id: "unific",
-    name: "Únific+",
-    carrier: "Únific+ Log",
-    logo: <UnificMark />,
-  },
   {
     id: "mercado_livre",
     name: "M. Livre",
     carrier: "Mercado Envios",
     logo: <MercadoLivreMark />,
+  },
+  {
+    id: "unific",
+    name: "Únific+",
+    carrier: "Únific+ Log",
+    logo: <UnificMark />,
   },
   {
     id: "shopee",
@@ -155,5 +157,14 @@ export const MARKETPLACES: Marketplace[] = [
   },
 ];
 
+/**
+ * Marketplace pelo id, com o Únific+ como reserva.
+ *
+ * A reserva é buscada por id, não por posição: antes era `MARKETPLACES[0]`, e
+ * assim qualquer mudança na ordem dos cartões trocava, sem querer, o rótulo
+ * exibido para pedido com marketplace desconhecido ou vazio.
+ */
 export const getMarketplace = (id: string): Marketplace =>
-  MARKETPLACES.find((m) => m.id === id) ?? MARKETPLACES[0]!;
+  MARKETPLACES.find((m) => m.id === id) ??
+  MARKETPLACES.find((m) => m.id === "unific") ??
+  MARKETPLACES[0]!;
