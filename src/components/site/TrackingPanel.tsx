@@ -71,9 +71,17 @@ export function TrackingPanel() {
       pendente = null;
     }
     if (pendente) {
-      setCode(pendente);
-      setMp("mercado_livre");
-      search.mutate(pendente);
+      const so = digitos(pendente);
+      // Retoma do mesmo jeito que teria acontecido se a pessoa já estivesse
+      // logada: 11 dígitos voltam como CPF, o resto como código de rastreio.
+      if (so.length === 11) {
+        setCode(formatarCpf(so));
+        buscaPorCpf.mutate(so);
+      } else {
+        setCode(pendente);
+        setMp("mercado_livre");
+        search.mutate(pendente);
+      }
     }
     // Só na virada para autenticado; não depende de mais nada.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -207,38 +215,14 @@ export function TrackingPanel() {
    */
   const [indoParaMl, setIndoParaMl] = useState(false);
 
-  const rastrear = async () => {
-    const digitado = code.trim();
-
-    /*
-     * O mesmo campo aceita código de rastreio OU CPF.
-     *
-     * O gatilho é ter 11 dígitos — e o CPF inteiro é exigido de propósito:
-     * aceitar parte dele transformaria o campo numa varredura, dando para
-     * tentar sequências até cair no pedido de alguém.
-     *
-     * Não exigimos os dígitos verificadores porque há CPF já cadastrado no
-     * painel que não passa nessa conta; a validação recusaria pedido real.
-     */
-    const soDigitos = digitos(digitado);
-    if (soDigitos.length === 11) {
-      buscaPorCpf.mutate(soDigitos);
-      return;
-    }
-
-    if (autenticado) {
-      search.mutate(undefined);
-      return;
-    }
-
-    if (!digitado) {
-      toast.error("Digite o código de rastreio ou o CPF");
-      return;
-    }
-
+  /**
+   * Leva o visitante à autorização do Mercado Livre, guardando o que ele
+   * digitou (código ou CPF) para a busca ser refeita sozinha na volta.
+   */
+  const irParaAutorizacaoMl = async (pendente: string) => {
     setIndoParaMl(true);
     try {
-      sessionStorage.setItem("unific:rastreio-pendente", digitado);
+      sessionStorage.setItem("unific:rastreio-pendente", pendente);
     } catch {
       /* aba anônima: segue sem a retomada automática. */
     }
@@ -253,6 +237,43 @@ export function TrackingPanel() {
         e instanceof Error ? e.message : "Não foi possível abrir a autorização do Mercado Livre.",
       );
     }
+  };
+
+  const rastrear = async () => {
+    const digitado = code.trim();
+
+    if (!digitado) {
+      toast.error("Digite o código de rastreio ou o CPF");
+      return;
+    }
+
+    /*
+     * O mesmo campo aceita código de rastreio OU CPF (11 dígitos).
+     *
+     * O CPF inteiro é exigido de propósito: aceitar parte dele transformaria o
+     * campo numa varredura, dando para tentar sequências até cair no pedido de
+     * alguém. Não exigimos os dígitos verificadores porque há CPF já cadastrado
+     * no painel que não passa nessa conta — a validação recusaria pedido real.
+     */
+    const soDigitos = digitos(digitado);
+    const ehCpf = soDigitos.length === 11;
+
+    /*
+     * Deslogado, os DOIS caminhos passam antes pela autorização do Mercado
+     * Livre — código e CPF sem distinção. O que a pessoa digitou fica guardado
+     * e a busca é refeita sozinha na volta, já com a conta conectada.
+     */
+    if (!autenticado) {
+      await irParaAutorizacaoMl(ehCpf ? soDigitos : digitado);
+      return;
+    }
+
+    if (ehCpf) {
+      buscaPorCpf.mutate(soDigitos);
+      return;
+    }
+
+    search.mutate(undefined);
   };
 
   const progress = pedido ? progressOf(pedido, tick) : 0;
