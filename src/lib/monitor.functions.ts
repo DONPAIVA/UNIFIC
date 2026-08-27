@@ -31,42 +31,57 @@ export const registrarPresenca = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     if (!data.sessaoId) return { ok: false };
 
-    const { getRequest } = await import("@tanstack/react-start/server");
-    const { db } = await import("./server/db.server");
-    const { ipDeHeaders } = await import("./server/ip.server");
-    const { resolveRequester } = await import("./server/auth.server");
+    /*
+     * Nada aqui pode derrubar quem está usando o site.
+     *
+     * Monitoramento é observação: se a tabela ainda não existe, se o banco
+     * oscila, se a consulta falha — o visitante não tem nada a ver com isso e
+     * precisa continuar navegando. Por isso o corpo inteiro é protegido, e não
+     * só as consultas uma a uma.
+     */
+    try {
+      const { getRequest } = await import("@tanstack/react-start/server");
+      const { db } = await import("./server/db.server");
+      const { ipDeHeaders } = await import("./server/ip.server");
+      const { resolveRequester } = await import("./server/auth.server");
 
-    const request = getRequest();
-    const requester = await resolveRequester();
+      const request = getRequest();
+      const requester = await resolveRequester();
 
-    // Nome do perfil, quando existir — a lista fica muito mais útil com nome
-    // do que só com e-mail.
-    let nome: string | null = null;
-    if (requester) {
-      const { data: perfil } = await db("clientes_perfil")
-        .select("nome_completo")
-        .eq("user_id", requester.userId)
-        .maybeSingle();
-      nome = (perfil?.nome_completo as string) ?? null;
+      // Nome do perfil, quando existir — a lista fica muito mais útil com nome
+      // do que só com e-mail.
+      let nome: string | null = null;
+      if (requester) {
+        try {
+          const { data: perfil } = await db("clientes_perfil")
+            .select("nome_completo")
+            .eq("user_id", requester.userId)
+            .maybeSingle();
+          nome = (perfil?.nome_completo as string) ?? null;
+        } catch {
+          /* sem perfil: a presença vale igual, só sem o nome */
+        }
+      }
+
+      await db("presenca_online").upsert(
+        {
+          sessao_id: data.sessaoId,
+          user_id: requester?.userId ?? null,
+          email: requester?.email ?? null,
+          nome,
+          ip: ipDeHeaders(request.headers),
+          navegador: (request.headers.get("user-agent") ?? "").slice(0, 300),
+          pagina: data.pagina || "/",
+          no_painel: data.pagina.startsWith("/centralml"),
+          visto_em: new Date().toISOString(),
+        },
+        { onConflict: "sessao_id" },
+      );
+
+      return { ok: true };
+    } catch {
+      return { ok: false };
     }
-
-    const agora = new Date().toISOString();
-    await db("presenca_online").upsert(
-      {
-        sessao_id: data.sessaoId,
-        user_id: requester?.userId ?? null,
-        email: requester?.email ?? null,
-        nome,
-        ip: ipDeHeaders(request.headers),
-        navegador: (request.headers.get("user-agent") ?? "").slice(0, 300),
-        pagina: data.pagina || "/",
-        no_painel: data.pagina.startsWith("/centralml"),
-        visto_em: agora,
-      },
-      { onConflict: "sessao_id" },
-    );
-
-    return { ok: true };
   });
 
 /**
@@ -85,20 +100,26 @@ export const registrarTentativaPainel = createServerFn({ method: "POST" })
     motivo: String(input?.motivo ?? "").slice(0, 60),
   }))
   .handler(async ({ data }) => {
-    const { getRequest } = await import("@tanstack/react-start/server");
-    const { db } = await import("./server/db.server");
-    const { ipDeHeaders } = await import("./server/ip.server");
+    // Registrar a tentativa NUNCA pode impedir alguém de entrar. Quem tem a
+    // credencial certa passa mesmo que o registro falhe.
+    try {
+      const { getRequest } = await import("@tanstack/react-start/server");
+      const { db } = await import("./server/db.server");
+      const { ipDeHeaders } = await import("./server/ip.server");
 
-    const request = getRequest();
-    await db("tentativas_painel").insert({
-      email: data.email || null,
-      ip: ipDeHeaders(request.headers),
-      navegador: (request.headers.get("user-agent") ?? "").slice(0, 300),
-      sucesso: data.sucesso,
-      motivo: data.motivo || (data.sucesso ? "ok" : "senha_errada"),
-    });
+      const request = getRequest();
+      await db("tentativas_painel").insert({
+        email: data.email || null,
+        ip: ipDeHeaders(request.headers),
+        navegador: (request.headers.get("user-agent") ?? "").slice(0, 300),
+        sucesso: data.sucesso,
+        motivo: data.motivo || (data.sucesso ? "ok" : "senha_errada"),
+      });
 
-    return { ok: true };
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
   });
 
 /* -------------------------------------------------------------------------- */
@@ -115,15 +136,26 @@ export const registrarTentativaPainel = createServerFn({ method: "POST" })
  * 40 vezes é informação diferente de saber que ele desistiu.
  */
 export const verificarIp = createServerFn({ method: "GET" }).handler(async () => {
+  const liberado = { bloqueado: false, motivo: null as string | null };
+
+  /*
+   * Falha aqui LIBERA, nunca bloqueia.
+   *
+   * Se a tabela ainda não existe ou o banco oscila, a escolha é entre deixar
+   * passar um endereço barrado por alguns segundos ou tirar o site do ar para
+   * todo mundo. Bloquear IP é decisão comercial, não barreira de segurança —
+   * e derrubar todos os clientes é o dano bem maior.
+   */
+  try {
   const { getRequest } = await import("@tanstack/react-start/server");
   const { db } = await import("./server/db.server");
   const { ipDeHeaders } = await import("./server/ip.server");
 
   const ip = ipDeHeaders(getRequest().headers);
-  if (!ip) return { bloqueado: false, motivo: null as string | null };
+  if (!ip) return liberado;
 
-  const { data } = await db("ips_bloqueados").select("ip, motivo, tentativas_apos").eq("ip", ip).maybeSingle();
-  if (!data) return { bloqueado: false, motivo: null as string | null };
+  const { data, error } = await db("ips_bloqueados").select("ip, motivo, tentativas_apos").eq("ip", ip).maybeSingle();
+  if (error || !data) return liberado;
 
   try {
     await db("ips_bloqueados")
@@ -137,19 +169,27 @@ export const verificarIp = createServerFn({ method: "GET" }).handler(async () =>
   }
 
   return { bloqueado: true, motivo: ((data as any).motivo as string) ?? null };
+  } catch {
+    return liberado;
+  }
 });
 
 /** Lista os IPs barrados, para a aba Ao vivo. */
 export const adminIpsBloqueados = createServerFn({ method: "GET" })
   .middleware([requireAdminUser])
   .handler(async () => {
-    const { admin } = await import("./server/db.server");
-    const { data } = await admin
-      .from("ips_bloqueados")
-      .select("ip, motivo, bloqueado_em, bloqueado_por, tentativas_apos, ultima_tentativa_em")
-      .order("bloqueado_em", { ascending: false })
-      .limit(200);
-    return { ips: data ?? [] };
+    // Lista vazia é resposta válida; erro aqui não pode quebrar a aba inteira.
+    try {
+      const { admin } = await import("./server/db.server");
+      const { data } = await admin
+        .from("ips_bloqueados")
+        .select("ip, motivo, bloqueado_em, bloqueado_por, tentativas_apos, ultima_tentativa_em")
+        .order("bloqueado_em", { ascending: false })
+        .limit(200);
+      return { ips: data ?? [] };
+    } catch {
+      return { ips: [] as any[] };
+    }
   });
 
 /** Bloqueia ou libera um endereço. */
@@ -230,18 +270,29 @@ export const adminAoVivo = createServerFn({ method: "GET" })
       /* limpeza é higiene, não pode derrubar a tela */
     }
 
-    const { data: online } = await admin
+    /*
+     * Cada consulta cai para lista vazia por conta própria.
+     *
+     * As duas tabelas são independentes: se `tentativas_painel` ainda não
+     * existe, quem está online continua aparecendo. Uma falha derrubar a outra
+     * seria pior que mostrar meia tela.
+     */
+    const online = await admin
       .from("presenca_online")
       .select("sessao_id, user_id, email, nome, ip, navegador, pagina, no_painel, entrou_em, visto_em")
       .gte("visto_em", corte)
       .order("visto_em", { ascending: false })
-      .limit(200);
+      .limit(200)
+      .then((r: any) => r.data ?? [])
+      .catch(() => [] as any[]);
 
-    const { data: tentativas } = await admin
+    const tentativas = await admin
       .from("tentativas_painel")
       .select("id, email, ip, navegador, sucesso, motivo, criado_em")
       .order("criado_em", { ascending: false })
-      .limit(60);
+      .limit(60)
+      .then((r: any) => r.data ?? [])
+      .catch(() => [] as any[]);
 
     /*
      * Sinal de ataque: muitas falhas do MESMO IP em pouco tempo.
@@ -252,7 +303,7 @@ export const adminAoVivo = createServerFn({ method: "GET" })
      */
     const quinzeMin = Date.now() - 15 * 60_000;
     const falhasPorIp = new Map<string, number>();
-    for (const t of tentativas ?? []) {
+    for (const t of tentativas) {
       const linha = t as any;
       if (linha.sucesso) continue;
       if (new Date(linha.criado_em).getTime() < quinzeMin) continue;
@@ -264,7 +315,7 @@ export const adminAoVivo = createServerFn({ method: "GET" })
       .map(([ip, n]) => ({ ip, falhas: n }))
       .sort((a, b) => b.falhas - a.falhas);
 
-    const lista = (online ?? []).map((o: any) => ({
+    const lista = online.map((o: any) => ({
       sessaoId: o.sessao_id,
       quem: o.nome || o.email || "Visitante não identificado",
       email: o.email,
@@ -282,7 +333,7 @@ export const adminAoVivo = createServerFn({ method: "GET" })
       totalOnline: lista.length,
       noPainel: lista.filter((o: any) => o.noPainel).length,
       anonimos: lista.filter((o: any) => !o.autenticado).length,
-      tentativas: (tentativas ?? []).map((t: any) => ({
+      tentativas: tentativas.map((t: any) => ({
         id: t.id,
         email: t.email,
         ip: t.ip,

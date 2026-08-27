@@ -65,21 +65,29 @@ export const salvarMeuPerfil = createServerFn({ method: "POST" })
  * Sem sessão, devolve liberado — visitante anônimo usa o site normalmente.
  */
 export const meuAcesso = createServerFn({ method: "GET" }).handler(async () => {
-  const { resolveRequester } = await import("./server/auth.server");
-  const requester = await resolveRequester();
-  if (!requester) return { autenticado: false, bloqueado: false, motivo: null as string | null };
+  const liberado = { autenticado: false, bloqueado: false, motivo: null as string | null };
 
-  if (!requester.bloqueado) {
-    return { autenticado: true, bloqueado: false, motivo: null as string | null };
+  // Falha aqui LIBERA: um erro de banco não pode trancar todos os clientes
+  // para fora do site.
+  try {
+    const { resolveRequester } = await import("./server/auth.server");
+    const requester = await resolveRequester();
+    if (!requester) return liberado;
+
+    if (!requester.bloqueado) {
+      return { autenticado: true, bloqueado: false, motivo: null as string | null };
+    }
+
+    const { db } = await import("./server/db.server");
+    const { data } = await db("clientes_bloqueados")
+      .select("motivo")
+      .eq("user_id", requester.userId)
+      .maybeSingle();
+
+    return { autenticado: true, bloqueado: true, motivo: (data?.motivo as string) ?? null };
+  } catch {
+    return liberado;
   }
-
-  const { db } = await import("./server/db.server");
-  const { data } = await db("clientes_bloqueados")
-    .select("motivo")
-    .eq("user_id", requester.userId)
-    .maybeSingle();
-
-  return { autenticado: true, bloqueado: true, motivo: (data?.motivo as string) ?? null };
 });
 
 /**
