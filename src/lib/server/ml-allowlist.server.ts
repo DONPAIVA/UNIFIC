@@ -73,6 +73,17 @@ export const ML_ALLOWED_ENDPOINTS: AllowedEndpoint[] = [
   { label: "Ações da reclamação", pattern: "/post-purchase/v1/claims/:id/actions", methods: ["GET"], description: "O que o ML permite fazer nesta reclamação." },
   { label: "Executar ação", pattern: "/post-purchase/v1/claims/:id/actions/:id", methods: ["POST"], description: "Executa uma ação disponível (fechar, responder, devolver...)." },
 
+  /* ---- Reclamações: leitura detalhada e teste de abertura ----
+     Os quatro primeiros são documentados pelo Mercado Livre. O último,
+     POST /post-purchase/v1/claims, NÃO consta na documentação — está aqui
+     justamente para você poder testar e ver a resposta real do ML, em vez de
+     depender da palavra de alguém sobre existir ou não. */
+  { label: "Detalhe da reclamação", pattern: "/post-purchase/v1/claims/:id/detail", methods: ["GET"], description: "Estado atual e histórico completo da reclamação." },
+  { label: "Resoluções da reclamação", pattern: "/post-purchase/v1/claims/:id/resolutions", methods: ["GET"], description: "O que cada parte espera como desfecho (reembolso, devolução...)." },
+  { label: "Evidências da reclamação", pattern: "/post-purchase/v1/claims/:id/actions/evidences", methods: ["POST"], description: "Anexa comprovante (envio, nota, foto) à reclamação." },
+  { label: "Reputação afetada", pattern: "/post-purchase/v1/claims/:id/affects-reputation", methods: ["GET"], description: "Se esta reclamação pesa na reputação do vendedor." },
+  { label: "TESTE: abrir reclamação", pattern: "/post-purchase/v1/claims", methods: ["GET", "POST"], description: "Rota não documentada. Use para comprovar se o ML aceita criar reclamação por API." },
+
   /* ---- Pagamentos ----
      O tópico `payments` notifica ora /collections/{id}, ora /payments/{id}.
      Os dois apontam para o mesmo registro do Mercado Pago. */
