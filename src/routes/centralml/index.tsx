@@ -196,7 +196,7 @@ function Panel({ title, right, children }: { title: string; right?: React.ReactN
     <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.18)]">
       <div className="h-1 w-full bg-[#FFE600]" />
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
-        <h2 className="flex items-center gap-2.5 text-sm font-black uppercase tracking-wide text-[#3483FA]">
+        <h2 className="flex items-center gap-2.5 text-sm font-black uppercase tracking-wide text-[#1F5FD4]">
           <span className="h-4 w-1 rounded-full bg-[#FFE600]" />
           {title}
         </h2>
@@ -213,10 +213,10 @@ function Panel({ title, right, children }: { title: string; right?: React.ReactN
  */
 function Stat({ label, value, tone = "default" }: { label: string; value: React.ReactNode; tone?: "default" | "alert" | "ok" }) {
   const toneClass =
-    tone === "alert" ? "text-red-700" : tone === "ok" ? "text-emerald-700" : "text-[#3483FA]";
+    tone === "alert" ? "text-red-700" : tone === "ok" ? "text-emerald-700" : "text-[#1F5FD4]";
   return (
     <div className="rounded-xl border-2 border-[#FFE600] bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.18)]">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-700">{label}</p>
       <p className={`mt-1 text-2xl font-black tabular-nums ${toneClass}`}>{value}</p>
     </div>
   );
@@ -231,12 +231,12 @@ function Badge({ children, className = "" }: { children: React.ReactNode; classN
 }
 
 function Empty({ children = SEM_DADOS }: { children?: React.ReactNode }) {
-  return <p className="py-8 text-center text-sm font-medium text-zinc-500">{children}</p>;
+  return <p className="py-8 text-center text-sm font-medium text-zinc-700">{children}</p>;
 }
 
 function Loading() {
   return (
-    <div className="flex items-center justify-center gap-2 py-10 text-zinc-500">
+    <div className="flex items-center justify-center gap-2 py-10 text-zinc-700">
       <LoaderCircle className="h-5 w-5 animate-spin" />
       <span className="text-sm">Carregando…</span>
     </div>
@@ -269,7 +269,7 @@ function Table({ head, children }: { head: string[]; children: React.ReactNode }
     <div className="overflow-x-auto rounded-lg border border-zinc-200">
       <table className="w-full min-w-[720px] text-left text-sm">
         <thead>
-          <tr className="border-b-2 border-[#FFE600] bg-[#FFFBE0] text-[11px] uppercase tracking-wide text-[#3483FA]">
+          <tr className="border-b-2 border-[#FFE600] bg-[#FFFBE0] text-[11px] uppercase tracking-wide text-[#1F5FD4]">
             {head.map((h) => (
               <th key={h} className="whitespace-nowrap px-2 py-2.5 font-black">
                 {h}
@@ -397,7 +397,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
    */
   const campo =
     "w-full rounded-lg border-2 border-[#FFE600] bg-white py-3.5 pl-11 pr-4 text-base font-semibold text-zinc-900 " +
-    "placeholder:text-zinc-500 placeholder:text-[13px] placeholder:font-bold " +
+    "placeholder:text-zinc-700 placeholder:text-[13px] placeholder:font-bold " +
     "placeholder:uppercase placeholder:tracking-[0.12em] outline-none transition " +
     "focus:border-[#3483FA] focus:ring-2 focus:ring-[#3483FA]/20";
 
@@ -434,7 +434,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
           <h1 className="mt-5 text-[21px] font-black uppercase leading-tight tracking-[0.12em] text-[#2D3277]">
             Olho de Deus ML
           </h1>
-          <p className="mt-2 text-[12px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+          <p className="mt-2 text-[12px] font-bold uppercase tracking-[0.14em] text-zinc-700">
             Painel do Mercado Livre
           </p>
         </div>
@@ -447,7 +447,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
 
         <div className="mt-7 space-y-3">
           <div className="relative">
-            <Users className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <Users className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
             <input
               type="email"
               required
@@ -460,7 +460,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
           </div>
 
           <div className="relative">
-            <Key className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <Key className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
             <input
               type={verSenha ? "text" : "password"}
               required
@@ -474,7 +474,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
               type="button"
               onClick={() => setVerSenha((v) => !v)}
               aria-label={verSenha ? "Ocultar senha" : "Mostrar senha"}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-2 text-zinc-400 transition hover:text-zinc-700"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-2 text-zinc-600 transition hover:text-zinc-700"
             >
               {verSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -516,7 +516,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
         <button
           type="button"
           onClick={() => void recuperarSenha()}
-          className="mt-3 w-full rounded-md bg-[#3483FA]/10 px-4 py-3 text-[15px] font-bold text-[#3483FA] transition hover:bg-[#3483FA]/15"
+          className="mt-3 w-full rounded-md bg-[#3483FA]/10 px-4 py-3 text-[15px] font-bold text-[#1F5FD4] transition hover:bg-[#3483FA]/15"
         >
           Recuperar acesso
         </button>
@@ -670,7 +670,7 @@ function CentralML() {
               />
               <div className="leading-none">
                 <span className="block text-xl font-black tracking-tight text-[#2D3277]">OLHO DE DEUS ML</span>
-                <span className="mt-0.5 block text-[10px] font-black uppercase tracking-[0.16em] text-[#2D3277]/70">
+                <span className="mt-0.5 block text-[10px] font-black uppercase tracking-[0.16em] text-[#2D3277]">
                   Painel do Mercado Livre
                 </span>
               </div>
@@ -703,7 +703,7 @@ function CentralML() {
             <div className="space-y-2 p-3">
               {GRUPOS.map((grupo) => (
                 <div key={grupo} className="flex flex-wrap items-center gap-2">
-                  <span className="flex w-[110px] shrink-0 items-center gap-2 text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                  <span className="flex w-[110px] shrink-0 items-center gap-2 text-[10px] font-black uppercase tracking-wider text-zinc-700">
                     <span className="h-3 w-1 rounded-full bg-[#FFE600]" />
                     {grupo}
                   </span>
@@ -717,7 +717,7 @@ function CentralML() {
                             // de cores do Mercado Livre e destaca mais que o azul
                             // cheio, que competia com os botões de ação.
                             "border-[#FFE600] bg-[#FFE600] text-[#2D3277] shadow-sm"
-                          : "border-zinc-200 bg-white text-zinc-600 hover:border-[#FFE600] hover:text-[#3483FA]"
+                          : "border-zinc-200 bg-white text-zinc-600 hover:border-[#FFE600] hover:text-[#1F5FD4]"
                       }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
@@ -767,18 +767,18 @@ function AccountSelector({ accountId, onChange }: { accountId: string | null; on
     <div className="rounded-xl border border-zinc-200 bg-white/95 p-4 shadow-sm backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Users className="h-4 w-4 text-[#3483FA]" />
+          <Users className="h-4 w-4 text-[#1F5FD4]" />
           <span className="text-sm font-bold text-zinc-700">Conta em foco:</span>
           {current ? (
             <>
-              <span className="text-sm font-bold text-[#3483FA]">{current.nickname || current.ml_user_id}</span>
+              <span className="text-sm font-bold text-[#1F5FD4]">{current.nickname || current.ml_user_id}</span>
               <Badge className={accountStatus(current.status).className}>{accountStatus(current.status).label}</Badge>
               <Badge className={`border-transparent ${TOKEN_STATE[current.tokenStatus?.state ?? ""]?.className ?? "bg-zinc-100 text-zinc-700"}`}>
                 {TOKEN_STATE[current.tokenStatus?.state ?? ""]?.label ?? "—"}
               </Badge>
             </>
           ) : (
-            <span className="text-sm text-zinc-500">Todas as contas</span>
+            <span className="text-sm text-zinc-700">Todas as contas</span>
           )}
         </div>
 
@@ -802,7 +802,7 @@ function AccountSelector({ accountId, onChange }: { accountId: string | null; on
       </div>
       {error && <p className="mt-3 text-xs font-semibold text-red-600">{error}</p>}
       {!loading && !error && accounts.length === 0 && (
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-zinc-700">
           Nenhuma conta autorizou o aplicativo ainda. Assim que um cliente concluir o OAuth no Unific+, ela aparece aqui.
         </p>
       )}
@@ -855,7 +855,7 @@ function DashboardTab({ onOpenAccount }: { onOpenAccount: (id: string) => void }
             <Table head={["Conta", "ML user", "Status", "Token", "Última sync"]}>
               {data.accounts.map((a: any) => (
                 <tr key={a.id} className="cursor-pointer hover:bg-zinc-50" onClick={() => onOpenAccount(a.id)}>
-                  <td className="px-2 py-2 font-semibold text-[#3483FA]">{a.nickname || "—"}</td>
+                  <td className="px-2 py-2 font-semibold text-[#1F5FD4]">{a.nickname || "—"}</td>
                   <td className="px-2 py-2 font-mono text-xs">{a.ml_user_id}</td>
                   <td className="px-2 py-2">
                     <Badge className={accountStatus(a.status).className}>{accountStatus(a.status).label}</Badge>
@@ -924,7 +924,7 @@ function DashboardTab({ onOpenAccount }: { onOpenAccount: (id: string) => void }
               {data.lastLogs.map((l: any) => (
                 <li key={l.id} className="flex items-start gap-2 text-xs">
                   <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${l.level === "error" ? "bg-red-500" : l.level === "warn" ? "bg-amber-500" : "bg-emerald-500"}`} />
-                  <span className="w-36 shrink-0 text-zinc-500">{fmtDateTime(l.created_at)}</span>
+                  <span className="w-36 shrink-0 text-zinc-700">{fmtDateTime(l.created_at)}</span>
                   <span className="w-28 shrink-0 font-semibold text-zinc-700">{l.category}</span>
                   <span className="flex-1 text-zinc-600">{l.error || l.message || l.action}</span>
                 </li>
@@ -1002,7 +1002,7 @@ function ContasTab({ accountId, onSelect }: { accountId: string | null; onSelect
           {accounts.map((a: any) => (
             <tr key={a.id} className="align-middle hover:bg-zinc-50">
               <td className="px-2 py-2">
-                <button onClick={() => onSelect(a.id)} className="font-mono text-[11px] text-[#3483FA] underline">
+                <button onClick={() => onSelect(a.id)} className="font-mono text-[11px] text-[#1F5FD4] underline">
                   {String(a.id).slice(0, 8)}…
                 </button>
               </td>
@@ -1157,7 +1157,7 @@ function ContaDetalhe({ id, onBack }: { id: string; onBack: () => void }) {
           <Stat label="Erros de sync" value={data.counts.errors} tone={data.counts.errors ? "alert" : "default"} />
         </div>
 
-        <p className="mt-4 rounded-lg bg-zinc-50 p-3 text-[11px] text-zinc-500">
+        <p className="mt-4 rounded-lg bg-zinc-50 p-3 text-[11px] text-zinc-700">
           <Key className="mr-1 inline h-3 w-3" />
           access_token e refresh_token existem apenas no servidor. Esta tela nunca os recebe.
         </p>
@@ -1234,7 +1234,7 @@ function EnviarMensagem({ orderId, onEnviado }: { orderId: string; onEnviado: ()
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
         rows={3}
-        className="w-full rounded-lg border border-zinc-300 bg-white p-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-[#3483FA]"
+        className="w-full rounded-lg border border-zinc-300 bg-white p-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#3483FA]"
         placeholder="Escreva uma mensagem para o vendedor…"
       />
       <div className="mt-2 flex items-center gap-3">
@@ -1250,7 +1250,7 @@ function EnviarMensagem({ orderId, onEnviado }: { orderId: string; onEnviado: ()
           <span className={`text-xs font-semibold ${aviso.ok ? "text-emerald-700" : "text-red-600"}`}>{aviso.msg}</span>
         )}
       </div>
-      <p className="mt-2 text-[11px] text-zinc-500">
+      <p className="mt-2 text-[11px] text-zinc-700">
         A mensagem sai pela conta do cliente, como se ele mesmo tivesse escrito. Fica registrada na auditoria.
       </p>
     </div>
@@ -1260,7 +1260,7 @@ function EnviarMensagem({ orderId, onEnviado }: { orderId: string; onEnviado: ()
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{label}</dt>
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-zinc-700">{label}</dt>
       <dd className="mt-0.5 text-sm text-zinc-800">{value}</dd>
     </div>
   );
@@ -1293,13 +1293,13 @@ function PedidosTab({ accountId }: { accountId: string | null }) {
       right={
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1 rounded-lg border border-zinc-300 px-2">
-            <Search className="h-3.5 w-3.5 text-zinc-500" />
+            <Search className="h-3.5 w-3.5 text-zinc-700" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && setTerm(q)}
               placeholder="pedido, título, comprador, envio"
-              className="w-56 bg-transparent py-1.5 text-xs text-zinc-900 outline-none placeholder:text-zinc-400"
+              className="w-56 bg-transparent py-1.5 text-xs text-zinc-900 outline-none placeholder:text-zinc-600"
             />
           </div>
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-900">
@@ -1333,7 +1333,7 @@ function PedidosTab({ accountId }: { accountId: string | null }) {
           >
             {data.rows.map((o: any) => (
               <tr key={o.id} className="cursor-pointer hover:bg-zinc-50" onClick={() => setOpenId(o.id)}>
-                <td className="px-2 py-2 font-mono text-xs text-[#3483FA]">{o.ml_order_id}</td>
+                <td className="px-2 py-2 font-mono text-xs text-[#1F5FD4]">{o.ml_order_id}</td>
                 <td className="px-2 py-2 text-xs">{fmtDateTime(o.date_created)}</td>
                 <td className="px-2 py-2 text-xs">{o.buyer_nickname || "—"}</td>
                 <td className="px-2 py-2 max-w-[280px] truncate text-xs">{o.title || "—"}</td>
@@ -1351,9 +1351,9 @@ function PedidosTab({ accountId }: { accountId: string | null }) {
                       <CheckCircle2 className="h-3 w-3" /> Marcar recebido
                     </span>
                   ) : o.buyer_feedback_at ? (
-                    <span className="text-[11px] text-zinc-500">recebido</span>
+                    <span className="text-[11px] text-zinc-700">recebido</span>
                   ) : (
-                    <span className="text-[11px] text-zinc-500">abrir</span>
+                    <span className="text-[11px] text-zinc-700">abrir</span>
                   )}
                 </td>
               </tr>
@@ -1427,7 +1427,7 @@ function PedidoDetalhe({ id, onBack }: { id: string; onBack: () => void }) {
           {data.actions.canMarkReceived ? (
             <div className="rounded-lg border border-zinc-200 p-4">
               <p className="text-sm font-bold text-zinc-800">Confirmar recebimento e avaliar a compra</p>
-              <p className="mt-0.5 text-xs text-zinc-500">
+              <p className="mt-0.5 text-xs text-zinc-700">
                 Envia o feedback de compra ao Mercado Livre. É único e irreversível.
               </p>
 
@@ -1456,10 +1456,10 @@ function PedidoDetalhe({ id, onBack }: { id: string; onBack: () => void }) {
                 onChange={(e) => setComentario(e.target.value.slice(0, 160))}
                 rows={2}
                 maxLength={160}
-                className="mt-3 w-full rounded-lg border border-zinc-300 bg-white p-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-[#3483FA]"
+                className="mt-3 w-full rounded-lg border border-zinc-300 bg-white p-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#3483FA]"
                 placeholder="Comentário para o vendedor (opcional, até 160 caracteres)"
               />
-              <p className="mt-1 text-right text-[10px] text-zinc-400">{comentario.length}/160</p>
+              <p className="mt-1 text-right text-[10px] text-zinc-600">{comentario.length}/160</p>
 
               <button
                 onClick={marcarRecebido}
@@ -1471,7 +1471,7 @@ function PedidoDetalhe({ id, onBack }: { id: string; onBack: () => void }) {
               </button>
             </div>
           ) : (
-            <p className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-500">
+            <p className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-700">
               {o.buyer_feedback_at
                 ? "Feedback já registrado no Mercado Livre — a operação não pode ser repetida."
                 : "Operação não disponível pela API oficial para o status atual deste pedido."}
@@ -1514,7 +1514,7 @@ function PedidoDetalhe({ id, onBack }: { id: string; onBack: () => void }) {
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{m.texto}</p>
-                  <p className="mt-1 text-[10px] text-zinc-500">
+                  <p className="mt-1 text-[10px] text-zinc-700">
                     {m.deMim ? "você" : "vendedor"} · {fmtDateTime(m.enviadaEm)}
                     {m.lidaEm ? " · lida" : " · não lida"}
                   </p>
@@ -1696,7 +1696,7 @@ function RastreioAoVivo({ accountId }: { accountId: string | null }) {
                   <td className="px-2 py-2 text-xs">{r.status || "—"}</td>
                   <td className="px-2 py-2 font-mono text-[11px]">{r.account_id ? String(r.account_id).slice(0, 8) + "…" : "—"}</td>
                   <td className="px-2 py-2 font-mono text-[11px]">{r.ip || "—"}</td>
-                  <td className="px-2 py-2 max-w-[220px] truncate text-[11px] text-zinc-500">{r.user_agent || "—"}</td>
+                  <td className="px-2 py-2 max-w-[220px] truncate text-[11px] text-zinc-700">{r.user_agent || "—"}</td>
                 </tr>
               ))}
             </Table>
@@ -2004,7 +2004,7 @@ function AoVivoTab() {
         title="Ao vivo"
         right={
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-zinc-500">atualiza sozinho</span>
+            <span className="text-[11px] text-zinc-700">atualiza sozinho</span>
             <button onClick={reload} className="rounded-lg bg-zinc-100 p-1.5 text-zinc-600 hover:bg-zinc-200">
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
@@ -2032,7 +2032,7 @@ function AoVivoTab() {
                     <td className="px-2 py-2 text-xs font-semibold">
                       {o.quem}
                       {!o.autenticado && (
-                        <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500">
+                        <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-700">
                           ANÔNIMO
                         </span>
                       )}
@@ -2046,7 +2046,7 @@ function AoVivoTab() {
                     <td className="px-2 py-2 font-mono text-xs">{o.ip || "—"}</td>
                     <td className="px-2 py-2 text-xs">{o.navegador}</td>
                     <td className="px-2 py-2 text-xs">{desde(o.desde)}</td>
-                    <td className="px-2 py-2 text-xs text-zinc-500">há {desde(o.visto)}</td>
+                    <td className="px-2 py-2 text-xs text-zinc-700">há {desde(o.visto)}</td>
                     <td className="px-2 py-2 text-xs">
                       {o.ip && !ipsBarrados.has(String(o.ip)) ? (
                         <button
@@ -2208,7 +2208,7 @@ function ReclamacoesDoPedido({
       {reclamacoes.length === 0 ? (
         <>
           <Empty>Nenhuma reclamação aberta para este pedido.</Empty>
-          <p className="mt-2 px-2 text-[11px] leading-relaxed text-zinc-500">
+          <p className="mt-2 px-2 text-[11px] leading-relaxed text-zinc-700">
             Abrir reclamação não é possível por aqui: o Mercado Livre não oferece esse endpoint na API — quem abre é o
             comprador, pelo site ou aplicativo deles. Quando existir uma, ela aparece nesta área com as ações que o
             próprio ML permitir.
@@ -2232,7 +2232,7 @@ function ReclamacoesDoPedido({
                     {r.status}
                   </span>
                 )}
-                {r.tipo && <span className="text-zinc-500">{r.tipo}</span>}
+                {r.tipo && <span className="text-zinc-700">{r.tipo}</span>}
               </div>
 
               <div className="mt-2 grid gap-x-6 gap-y-1 text-xs text-zinc-600 sm:grid-cols-2">
@@ -2244,7 +2244,7 @@ function ReclamacoesDoPedido({
               <div className="mt-3 border-t border-zinc-100 pt-3">
                 {r.acoesDisponiveis?.length ? (
                   <>
-                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-zinc-700">
                       Ações liberadas pelo Mercado Livre
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -2261,7 +2261,7 @@ function ReclamacoesDoPedido({
                     </div>
                   </>
                 ) : (
-                  <p className="text-[11px] text-zinc-500">
+                  <p className="text-[11px] text-zinc-700">
                     O Mercado Livre não liberou nenhuma ação nesta reclamação no momento. Isso depende do estágio dela e
                     de você ser comprador ou vendedor no pedido.
                   </p>
@@ -2341,7 +2341,7 @@ function DadosCompradorPanel({ faturamento }: { faturamento: any }) {
               ) : (
                 <button
                   onClick={() => setCpfVisivel(true)}
-                  className="font-mono text-zinc-500 underline decoration-dotted hover:text-zinc-900"
+                  className="font-mono text-zinc-700 underline decoration-dotted hover:text-zinc-900"
                   title="Clique para revelar"
                 >
                   {mascararCpf(doc)}
@@ -2473,7 +2473,7 @@ function ClientesTab() {
                   ) : (
                     <button
                       onClick={() => revelar(c.userId)}
-                      className="text-zinc-500 underline decoration-dotted hover:text-zinc-900"
+                      className="text-zinc-700 underline decoration-dotted hover:text-zinc-900"
                       title="Revelar o CPF completo. A consulta fica registrada na auditoria."
                     >
                       {c.cpfMascarado}
@@ -2482,7 +2482,7 @@ function ClientesTab() {
                 </td>
                 <td className="px-2 py-2 text-xs">{c.temPin ? "✓" : "—"}</td>
                 <td className="px-2 py-2 text-xs">
-                  {c.contasMl.length ? c.contasMl.join(", ") : <span className="text-zinc-400">nenhuma</span>}
+                  {c.contasMl.length ? c.contasMl.join(", ") : <span className="text-zinc-600">nenhuma</span>}
                 </td>
                 <td className="px-2 py-2 text-xs">{fmtDateTime(c.criadoEm)}</td>
                 <td className="px-2 py-2 text-xs">{c.ultimoAcessoEm ? fmtDateTime(c.ultimoAcessoEm) : "—"}</td>
@@ -2501,7 +2501,7 @@ function ClientesTab() {
               </tr>
             ))}
           </Table>
-          <p className="mt-2 px-2 text-[11px] text-zinc-500">
+          <p className="mt-2 px-2 text-[11px] text-zinc-700">
             Clique no CPF mascarado para ver o número completo — cada consulta fica registrada na Auditoria.
             Senha e PIN não são exibíveis: ficam guardados em hash e nem a administração consegue lê-los.
           </p>
@@ -2567,13 +2567,13 @@ function LogsTab({ accountId }: { accountId: string | null }) {
               <option value="error">error</option>
             </select>
             <div className="flex items-center gap-1 rounded-lg border border-zinc-300 px-2">
-              <Search className="h-3.5 w-3.5 text-zinc-500" />
+              <Search className="h-3.5 w-3.5 text-zinc-700" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && setTerm(q)}
                 placeholder="ação, endpoint, mensagem"
-                className="w-48 bg-transparent py-1.5 text-xs text-zinc-900 outline-none placeholder:text-zinc-400"
+                className="w-48 bg-transparent py-1.5 text-xs text-zinc-900 outline-none placeholder:text-zinc-600"
               />
             </div>
             <button onClick={() => setTerm(q)} className="rounded-lg bg-[#3483FA] px-3 py-1.5 text-xs font-bold text-white">
@@ -2640,7 +2640,7 @@ function LogsTab({ accountId }: { accountId: string | null }) {
           <pre className="max-h-[420px] overflow-auto rounded-lg bg-zinc-950 p-4 text-[11px] leading-relaxed text-emerald-300">
             {JSON.stringify(open, null, 2)}
           </pre>
-          <p className="mt-2 text-[11px] text-zinc-500">
+          <p className="mt-2 text-[11px] text-zinc-700">
             Segredos (tokens, client_secret, service_role_key) são removidos antes da gravação — nunca aparecem aqui.
           </p>
         </Panel>
@@ -2727,7 +2727,7 @@ function ErrosTab() {
           em <code className="rounded bg-zinc-100 px-1">/missed_feeds</code>. Esta rotina busca e processa o que ficou
           para trás, sem duplicar o que já entrou.
         </p>
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-xs text-zinc-700">
           Roda sozinha a cada execução do cron. O botão abaixo força agora.
         </p>
 
@@ -2937,7 +2937,7 @@ function ContaMlTab({ accountId }: { accountId: string | null }) {
               <Field label="Autorizado em" value={fmtDateTime(data.autorizacao.autorizadoEm)} />
               <Field label="Atualizado em" value={fmtDateTime(data.autorizacao.atualizadoEm)} />
             </dl>
-            <h3 className="mt-4 text-xs font-bold uppercase tracking-wide text-zinc-500">
+            <h3 className="mt-4 text-xs font-bold uppercase tracking-wide text-zinc-700">
               Permissões concedidas ({data.autorizacao.escopos.length})
             </h3>
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -3004,14 +3004,14 @@ function ContaMlTab({ accountId }: { accountId: string | null }) {
         <ul className="space-y-2">
           {data.indisponiveis.map((x: any) => (
             <li key={x.recurso} className="flex items-start gap-2 text-sm">
-              <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+              <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-zinc-600" />
               <span>
                 <strong>{x.recurso}</strong> — <span className="text-zinc-600">{x.motivo}</span>
               </span>
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-[11px] text-zinc-500">
+        <p className="mt-3 text-[11px] text-zinc-700">
           Cada item foi testado com o token real desta conta. Nada aqui é suposição.
         </p>
       </Panel>
@@ -3063,7 +3063,7 @@ function MensagensTab({ accountId }: { accountId: string | null }) {
       </Panel>
 
       <Panel title="Conversas por pedido">
-        <p className="mb-3 text-xs text-zinc-500">
+        <p className="mb-3 text-xs text-zinc-700">
           A conversa completa, com o campo para responder, fica dentro de cada pedido. Clique para abrir.
         </p>
         {pedidos.loading ? (
@@ -3074,7 +3074,7 @@ function MensagensTab({ accountId }: { accountId: string | null }) {
           <Table head={["Pedido", "Data", "Item", "Status", "Abrir conversa"]}>
             {pedidos.data.rows.map((o: any) => (
               <tr key={o.id}>
-                <td className="px-2 py-2 font-mono text-xs text-[#3483FA]">{o.ml_order_id}</td>
+                <td className="px-2 py-2 font-mono text-xs text-[#1F5FD4]">{o.ml_order_id}</td>
                 <td className="px-2 py-2 text-xs">{fmtDateTime(o.date_created)}</td>
                 <td className="px-2 py-2 max-w-[280px] truncate text-xs">{o.title ?? "—"}</td>
                 <td className="px-2 py-2 text-xs">{o.status ?? "—"}</td>
@@ -3140,7 +3140,7 @@ function PerguntasTab({ accountId }: { accountId: string | null }) {
             {data.perguntasRecebidas.itens.map((q: any) => (
               <li key={q.id} className="rounded-lg border border-zinc-200 p-3">
                 <p className="text-sm font-bold text-zinc-800">{q.text}</p>
-                <p className="mt-0.5 text-[11px] text-zinc-500">
+                <p className="mt-0.5 text-[11px] text-zinc-700">
                   {fmtDateTime(q.date_created)} · anúncio {q.item_id} · {q.status}
                 </p>
                 {q.answer ? (
@@ -3194,7 +3194,7 @@ function PerguntasTab({ accountId }: { accountId: string | null }) {
             {data.perguntasFeitas.itens.map((q: any) => (
               <li key={q.id} className="rounded-lg border border-zinc-200 p-3 text-sm">
                 <p className="font-bold text-zinc-800">{q.text}</p>
-                <p className="mt-0.5 text-[11px] text-zinc-500">
+                <p className="mt-0.5 text-[11px] text-zinc-700">
                   {fmtDateTime(q.date_created)} · anúncio {q.item_id}
                 </p>
                 {q.answer && (
@@ -3254,7 +3254,7 @@ function AnunciosTab({ accountId }: { accountId: string | null }) {
                 )}
                 <div className="min-w-[260px] flex-1">
                   <p className="text-sm font-bold text-zinc-900">{a.titulo ?? a.id}</p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
+                  <p className="mt-0.5 text-xs text-zinc-700">
                     <span className="font-mono">{a.id}</span>
                     {a.criadoEm ? ` · criado em ${fmtDateTime(a.criadoEm)}` : ""}
                   </p>
@@ -3295,7 +3295,7 @@ function AnunciosTab({ accountId }: { accountId: string | null }) {
                       href={a.permalink}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-1.5 inline-block text-xs font-bold text-[#3483FA] underline"
+                      className="mt-1.5 inline-block text-xs font-bold text-[#1F5FD4] underline"
                     >
                       abrir no Mercado Livre
                     </a>
@@ -3304,15 +3304,15 @@ function AnunciosTab({ accountId }: { accountId: string | null }) {
 
                 <div className="grid shrink-0 grid-cols-3 gap-3 text-center">
                   <div>
-                    <p className="text-[10px] font-bold uppercase text-zinc-500">Estoque</p>
+                    <p className="text-[10px] font-bold uppercase text-zinc-700">Estoque</p>
                     <p className="text-lg font-black tabular-nums">{a.estoque ?? "—"}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase text-zinc-500">Vendidos</p>
+                    <p className="text-[10px] font-bold uppercase text-zinc-700">Vendidos</p>
                     <p className="text-lg font-black tabular-nums">{a.vendidos ?? "—"}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase text-zinc-500">Visitas 30d</p>
+                    <p className="text-[10px] font-bold uppercase text-zinc-700">Visitas 30d</p>
                     <p className="text-lg font-black tabular-nums">{a.visitas30d ?? 0}</p>
                   </div>
                 </div>
@@ -3372,7 +3372,7 @@ function ReclamacoesPainel({ accountId }: { accountId: string | null }) {
   const linhas = (itens: any[]) =>
     itens.map((r) => (
       <tr key={r.id} className="cursor-pointer hover:bg-zinc-50" onClick={() => setAberta(String(r.id))}>
-        <td className="px-2 py-2 font-mono text-xs text-[#3483FA] underline">{r.id}</td>
+        <td className="px-2 py-2 font-mono text-xs text-[#1F5FD4] underline">{r.id}</td>
         <td className="px-2 py-2 font-mono text-[11px]">{r.pedido}</td>
         <td className="px-2 py-2 text-xs">{r.tipo ?? "—"}</td>
         <td className="px-2 py-2 text-xs">{r.estagio ?? "—"}</td>
@@ -3419,14 +3419,14 @@ function ReclamacoesPainel({ accountId }: { accountId: string | null }) {
             <Stat label="Em disputa / encerradas" value={data.encerradas.total} />
           </div>
 
-          <h3 className="mt-5 text-xs font-bold uppercase tracking-wide text-zinc-500">Em andamento</h3>
+          <h3 className="mt-5 text-xs font-bold uppercase tracking-wide text-zinc-700">Em andamento</h3>
           {data.emAndamento.itens.length === 0 ? (
             <Empty>Nenhuma reclamação aberta nesta conta.</Empty>
           ) : (
             <Table head={cabecalho}>{linhas(data.emAndamento.itens)}</Table>
           )}
 
-          <h3 className="mt-5 text-xs font-bold uppercase tracking-wide text-zinc-500">Em disputa / encerradas</h3>
+          <h3 className="mt-5 text-xs font-bold uppercase tracking-wide text-zinc-700">Em disputa / encerradas</h3>
           {data.encerradas.itens.length === 0 ? (
             <Empty>Nenhuma.</Empty>
           ) : (
@@ -3527,7 +3527,7 @@ function ReclamacaoDetalhe({
                 {data.mensagens.map((m: any, i: number) => (
                   <li key={m.id ?? i} className="rounded-lg border border-zinc-200 p-3 text-sm">
                     <p className="whitespace-pre-wrap">{m.message ?? m.text ?? JSON.stringify(m)}</p>
-                    <p className="mt-1 text-[10px] text-zinc-500">
+                    <p className="mt-1 text-[10px] text-zinc-700">
                       {m.sender_role ?? m.from?.role ?? "—"} · {fmtDateTime(m.date_created ?? m.date)}
                     </p>
                   </li>
@@ -3557,7 +3557,7 @@ function ReclamacaoDetalhe({
               </div>
             ) : (
               <>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-zinc-700">
                   Estas são as ações que o próprio Mercado Livre informou para esta reclamação. Nada aqui é inventado:
                   se não estiver na lista, o sistema recusa antes de chamar a API.
                 </p>
@@ -3594,7 +3594,7 @@ function ReclamacaoDetalhe({
           </Panel>
 
           <Panel title="Resoluções esperadas (caminho para encerrar)">
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-zinc-700">
               É por aqui que o Mercado Livre normalmente encerra uma reclamação — devolução, reembolso ou acordo.
               O conteúdo abaixo vem direto da API, sem interpretação nossa.
             </p>
@@ -3699,20 +3699,20 @@ function ConsoleTab({ accountId }: { accountId: string | null }) {
         )}
 
         <div className="mt-4">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-zinc-500">Ações rápidas</p>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-zinc-700">Ações rápidas</p>
           <div className="flex flex-wrap gap-2">
             {atalhos.map((a) => (
               <button
                 key={a.label}
                 onClick={() => aplicar(a)}
                 title={a.nota ?? a.endpoint}
-                className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700 hover:border-[#3483FA] hover:text-[#3483FA]"
+                className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700 hover:border-[#3483FA] hover:text-[#1F5FD4]"
               >
                 {a.label}
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-zinc-500">
+          <p className="mt-2 text-[11px] text-zinc-700">
             Clique para preencher o formulário abaixo, troque o que estiver em MAIÚSCULAS pelo ID real e execute.
           </p>
         </div>
@@ -3738,7 +3738,7 @@ function ConsoleTab({ accountId }: { accountId: string | null }) {
             value={endpoint}
             onChange={(e) => setEndpoint(e.target.value)}
             placeholder="/orders/search?buyer=123456"
-            className="min-w-[280px] flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-[#3483FA]"
+            className="min-w-[280px] flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#3483FA]"
           />
           <button
             onClick={executar}
@@ -3756,7 +3756,7 @@ function ConsoleTab({ accountId }: { accountId: string | null }) {
             onChange={(e) => setBody(e.target.value)}
             rows={6}
             spellCheck={false}
-            className="mt-3 w-full rounded-lg border border-zinc-300 bg-white p-3 font-mono text-xs text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-[#3483FA]"
+            className="mt-3 w-full rounded-lg border border-zinc-300 bg-white p-3 font-mono text-xs text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#3483FA]"
             placeholder='{"fulfilled": true, "rating": "positive"}'
           />
         )}
@@ -3774,11 +3774,11 @@ function ConsoleTab({ accountId }: { accountId: string | null }) {
               <Badge className={result.ok ? "border-emerald-300 bg-emerald-100 text-emerald-800" : "border-red-300 bg-red-100 text-red-800"}>
                 HTTP {result.status}
               </Badge>
-              <span className="text-zinc-500">{fmtDuration(result.durationMs)}</span>
-              <span className="font-mono text-zinc-500">
+              <span className="text-zinc-700">{fmtDuration(result.durationMs)}</span>
+              <span className="font-mono text-zinc-700">
                 {result.method} {result.endpoint}
               </span>
-              <span className="text-zinc-500">
+              <span className="text-zinc-700">
                 conta {result.account.nickname ?? result.account.mlUserId}
               </span>
               <button
@@ -3907,7 +3907,7 @@ function ConfiguracoesTab({ isAdmin }: { isAdmin: boolean }) {
           <Field label="Cron habilitado" value={<Flag on={c.cronEnabled} labelOn="sim" labelOff="não" />} />
           <Field label="Intervalo mínimo do cron" value={`${c.cronMinMinutes} min`} />
         </dl>
-        <p className="mt-4 rounded-lg bg-zinc-50 p-3 text-[11px] text-zinc-500">
+        <p className="mt-4 rounded-lg bg-zinc-50 p-3 text-[11px] text-zinc-700">
           Os valores dos segredos nunca são exibidos — apenas se estão configurados. Para trocar o domínio de produção,
           altere <code>APP_URL</code>/<code>ML_REDIRECT_URI</code> e cadastre a mesma Redirect URI no aplicativo do
           Mercado Livre.
@@ -3923,7 +3923,7 @@ function ConfiguracoesTab({ isAdmin }: { isAdmin: boolean }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="email@dominio.com (usuário já existente no Supabase Auth)"
-            className="min-w-[280px] flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-[#3483FA]"
+            className="min-w-[280px] flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#3483FA]"
           />
           <button
             onClick={adicionar}
@@ -3945,7 +3945,7 @@ function ConfiguracoesTab({ isAdmin }: { isAdmin: boolean }) {
                 <td className="px-2 py-2 text-xs">{fmtDateTime(a.created_at)}</td>
                 <td className="px-2 py-2">
                   {a.email === c.me.email ? (
-                    <span className="text-[11px] text-zinc-500">você</span>
+                    <span className="text-[11px] text-zinc-700">você</span>
                   ) : (
                     <button
                       onClick={() => remover(a.user_id)}
@@ -4021,7 +4021,7 @@ function DiagnosticoOAuth() {
                   <strong>Como resolver:</strong> {data.alcance.comoResolver}
                 </p>
               )}
-              <p className="mt-2 break-all font-mono text-[11px] text-zinc-500">
+              <p className="mt-2 break-all font-mono text-[11px] text-zinc-700">
                 {data.redirectUri || "(Redirect URI não configurada)"}
               </p>
             </div>
@@ -4057,7 +4057,7 @@ function DiagnosticoOAuth() {
             </button>
           )}
 
-          <h3 className="mt-5 text-xs font-bold uppercase tracking-wide text-zinc-500">Últimos eventos de OAuth</h3>
+          <h3 className="mt-5 text-xs font-bold uppercase tracking-wide text-zinc-700">Últimos eventos de OAuth</h3>
           {data.eventos.length === 0 ? (
             <Empty>Nenhuma tentativa de conexão registrada.</Empty>
           ) : (
@@ -4137,7 +4137,7 @@ function AuditoriaTab() {
                     <Badge className="border-red-300 bg-red-100 text-red-800">falha</Badge>
                   )}
                 </td>
-                <td className="px-2 py-2 max-w-[280px] truncate text-[11px] text-zinc-500">
+                <td className="px-2 py-2 max-w-[280px] truncate text-[11px] text-zinc-700">
                   {r.detail ? JSON.stringify(r.detail) : "—"}
                 </td>
               </tr>
