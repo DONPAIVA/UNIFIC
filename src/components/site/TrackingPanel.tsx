@@ -40,7 +40,9 @@ export function TrackingPanel() {
   // para poder receber um código por argumento na retomada automática.
   const [codeState, setCode] = useState("");
   const code = codeState;
-  const [mp, setMp] = useState<string>("unific");
+  // Mercado Livre já vem marcado: é o primeiro cartão e a origem da maioria
+  // dos rastreios, então abrir com ele selecionado poupa um clique.
+  const [mp, setMp] = useState<string>("mercado_livre");
   const [pedido, setPedido] = useState<Pedido | null>(null);
   // Eventos reais vindos da integração com o Mercado Livre (quando houver conta conectada)
   const [eventosReais, setEventosReais] = useState<Movimento[] | null>(null);
@@ -363,7 +365,10 @@ export function TrackingPanel() {
               setPedido(null);
               setEventosReais(null);
               setCode("");
-              setMp("unific");
+              setEscolhas(null);
+              // Mesmo estado inicial da tela, para "Nova busca" devolver
+              // exatamente o que o cliente veria ao abrir o site.
+              setMp("mercado_livre");
             }}
             className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold"
           >
