@@ -1526,6 +1526,12 @@ function PedidoDetalhe({ id, onBack }: { id: string; onBack: () => void }) {
         </Panel>
       )}
 
+      <ReclamacoesDoPedido
+        accountId={data.order.account_id}
+        reclamacoes={data.reclamacoes ?? []}
+        onMudou={reload}
+      />
+
       {data.faturamento && <DadosCompradorPanel faturamento={data.faturamento} />}
 
       <Panel title="Histórico de rastreamento">
@@ -2106,6 +2112,124 @@ function AoVivoTab() {
         )}
       </Panel>
     </>
+  );
+}
+
+/* ========================================================================== */
+/* Reclamações deste pedido                                                   */
+/* ========================================================================== */
+
+/**
+ * Reclamação vinculada ao pedido, com as ações que o Mercado Livre permite.
+ *
+ * IMPORTANTE, e o motivo de não existir botão "abrir reclamação":
+ * o ML não expõe endpoint público para ABRIR nem para ENCERRAR reclamação
+ * diretamente. Quem abre é o comprador, pelo site ou app deles.
+ *
+ * O que a API oferece é `/claims/{id}/actions`: uma lista do que PODE ser
+ * feito naquela reclamação específica, que muda conforme o estágio e conforme
+ * você ser comprador ou vendedor. Às vezes essa lista inclui encerrar.
+ *
+ * Por isso os botões aqui são gerados a partir da resposta do ML, nunca
+ * fixados no código. Botão que promete o que a API não faz é pior que
+ * ausência de botão.
+ */
+function ReclamacoesDoPedido({
+  accountId,
+  reclamacoes,
+  onMudou,
+}: {
+  accountId: string;
+  reclamacoes: any[];
+  onMudou: () => void;
+}) {
+  const [ocupado, setOcupado] = useState<string | null>(null);
+
+  const executar = async (claimId: string, acao: string) => {
+    if (!confirm(`Executar "${acao}" na reclamação ${claimId}?\n\nEsta ação é enviada ao Mercado Livre e pode não ter volta.`)) {
+      return;
+    }
+    const texto = prompt("Mensagem para acompanhar a ação (opcional):") ?? "";
+    setOcupado(`${claimId}:${acao}`);
+    try {
+      await adminReclamacaoAcao({ data: { accountId, claimId, acao, texto } });
+      onMudou();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "O Mercado Livre recusou a ação.");
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  return (
+    <Panel title={`Reclamações deste pedido${reclamacoes.length ? ` (${reclamacoes.length})` : ""}`}>
+      {reclamacoes.length === 0 ? (
+        <>
+          <Empty>Nenhuma reclamação aberta para este pedido.</Empty>
+          <p className="mt-2 px-2 text-[11px] leading-relaxed text-zinc-500">
+            Abrir reclamação não é possível por aqui: o Mercado Livre não oferece esse endpoint na API — quem abre é o
+            comprador, pelo site ou aplicativo deles. Quando existir uma, ela aparece nesta área com as ações que o
+            próprio ML permitir.
+          </p>
+        </>
+      ) : (
+        <div className="space-y-3">
+          {reclamacoes.map((r: any) => (
+            <div key={r.id} className="rounded-lg border border-zinc-200 p-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-mono font-bold text-zinc-900">#{r.id}</span>
+                {r.estagio && (
+                  <span className="rounded bg-amber-100 px-1.5 py-0.5 font-bold text-amber-800">{r.estagio}</span>
+                )}
+                {r.status && (
+                  <span
+                    className={`rounded px-1.5 py-0.5 font-bold ${
+                      r.status === "closed" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {r.status}
+                  </span>
+                )}
+                {r.tipo && <span className="text-zinc-500">{r.tipo}</span>}
+              </div>
+
+              <div className="mt-2 grid gap-x-6 gap-y-1 text-xs text-zinc-600 sm:grid-cols-2">
+                <span>Aberta em: {r.abertaEm ? fmtDateTime(r.abertaEm) : "—"}</span>
+                <span>Atualizada: {r.atualizadaEm ? fmtDateTime(r.atualizadaEm) : "—"}</span>
+                {r.motivo && <span className="sm:col-span-2">Motivo: {r.motivo}</span>}
+              </div>
+
+              <div className="mt-3 border-t border-zinc-100 pt-3">
+                {r.acoesDisponiveis?.length ? (
+                  <>
+                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                      Ações liberadas pelo Mercado Livre
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {r.acoesDisponiveis.map((a: string) => (
+                        <button
+                          key={a}
+                          disabled={ocupado !== null}
+                          onClick={() => void executar(String(r.id), a)}
+                          className="rounded-lg bg-[#3483FA] px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-[#2968C8] disabled:opacity-50"
+                        >
+                          {ocupado === `${r.id}:${a}` ? "enviando…" : a}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-zinc-500">
+                    O Mercado Livre não liberou nenhuma ação nesta reclamação no momento. Isso depende do estágio dela e
+                    de você ser comprador ou vendedor no pedido.
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
   );
 }
 

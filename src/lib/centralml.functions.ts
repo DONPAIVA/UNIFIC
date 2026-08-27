@@ -599,6 +599,54 @@ export const adminOrder = createServerFn({ method: "GET" })
       }
     }
 
+    /*
+     * Reclamações DESTE pedido.
+     *
+     * O Mercado Livre não expõe busca de reclamação por pedido, então lemos os
+     * dois estágios e filtramos pelo `resource_id`. São duas chamadas leves e
+     * é o único caminho confiável.
+     *
+     * Para cada uma, perguntamos o que ELE permite fazer agora
+     * (/claims/{id}/actions). A lista muda conforme o estágio e conforme você
+     * ser comprador ou vendedor — por isso nunca inventamos ação: mostramos o
+     * que a API respondeu.
+     */
+    const reclamacoes: any[] = [];
+    try {
+      const [emAndamento, emDisputa] = await Promise.all([
+        mlFetch(conta, "/post-purchase/v1/claims/search?stage=claim", { actor: ator }),
+        mlFetch(conta, "/post-purchase/v1/claims/search?stage=dispute", { actor: ator }),
+      ]);
+
+      const doPedido = [emAndamento, emDisputa]
+        .flatMap((r) => ((r.data as any)?.data ?? []) as any[])
+        .filter((c) => String(c?.resource_id ?? "") === String(order.ml_order_id));
+
+      for (const c of doPedido) {
+        const acoes = await mlFetch(conta, `/post-purchase/v1/claims/${c.id}/actions`, { actor: ator });
+        const lista = (
+          Array.isArray(acoes.data)
+            ? acoes.data
+            : ((acoes.data as any)?.available_actions ?? (acoes.data as any)?.results ?? [])
+        )
+          .map((a: any) => (typeof a === "string" ? a : (a?.action ?? a?.name ?? a?.id)))
+          .filter(Boolean);
+
+        reclamacoes.push({
+          id: String(c.id),
+          tipo: c.type ?? null,
+          estagio: c.stage ?? null,
+          status: c.status ?? null,
+          motivo: c.reason_id ?? null,
+          abertaEm: c.date_created ?? null,
+          atualizadaEm: c.last_updated ?? null,
+          acoesDisponiveis: lista,
+        });
+      }
+    } catch {
+      /* reclamação é complemento da tela; nunca derruba o pedido */
+    }
+
     const fb: any = (feedback as any)?.purchase ?? null;
 
     return {
@@ -607,6 +655,7 @@ export const adminOrder = createServerFn({ method: "GET" })
       shipment,
       events,
       actions: { canMarkReceived: canMarkReceived(order) },
+      reclamacoes,
 
       aoVivo: {
         ok: Boolean(aoVivo),
