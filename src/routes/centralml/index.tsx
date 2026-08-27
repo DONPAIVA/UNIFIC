@@ -3713,11 +3713,18 @@ function ConsoleTab({ accountId }: { accountId: string | null }) {
           <select
             value={method}
             onChange={(e) => setMethod(e.target.value as any)}
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-bold text-zinc-900"
+            translate="no"
+            className="notranslate rounded-lg border-2 border-[#FFE600] bg-white px-3 py-2 text-sm font-bold text-zinc-900"
           >
-            <option>GET</option>
-            <option>POST</option>
-            <option>PUT</option>
+            {/*
+              `value` explícito + `translate="no"`: sem isso o valor do option
+              vem do TEXTO visível, e o tradutor automático do Chrome trocava
+              "POST" por "PUBLICAR" — o servidor recebia esse método e recusava
+              com "Método não permitido: PUBLICAR".
+            */}
+            <option value="GET">GET</option>
+            <option value="POST">POST</option>
+            <option value="PUT">PUT</option>
           </select>
           <input
             value={endpoint}
