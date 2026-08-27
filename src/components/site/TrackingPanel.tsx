@@ -35,7 +35,10 @@ function useHydrated() {
 
 export function TrackingPanel() {
   const { autenticado } = useSessao();
-  const [code, setCode] = useState("");
+  // `codeState` é o que está no campo; a busca usa uma cópia local (`code`)
+  // para poder receber um código por argumento na retomada automática.
+  const [codeState, setCode] = useState("");
+  const code = codeState;
   const [mp, setMp] = useState<string>("unific");
   const [pedido, setPedido] = useState<Pedido | null>(null);
   // Eventos reais vindos da integração com o Mercado Livre (quando houver conta conectada)
@@ -48,6 +51,31 @@ export function TrackingPanel() {
     document.documentElement.setAttribute("data-mp", mp);
   }, [mp]);
 
+  /*
+   * Retoma o rastreio depois de conectar o Mercado Livre.
+   *
+   * Quem clicou em "RASTREAR AGORA" sem conta foi para a tela de entrada com o
+   * código guardado. Ao voltar já autenticado, o código volta preenchido e a
+   * busca dispara sozinha — o cliente não precisa digitar de novo.
+   */
+  useEffect(() => {
+    if (!autenticado) return;
+    let pendente: string | null = null;
+    try {
+      pendente = sessionStorage.getItem("unific:rastreio-pendente");
+      if (pendente) sessionStorage.removeItem("unific:rastreio-pendente");
+    } catch {
+      pendente = null;
+    }
+    if (pendente) {
+      setCode(pendente);
+      setMp("mercado_livre");
+      search.mutate(pendente);
+    }
+    // Só na virada para autenticado; não depende de mais nada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autenticado]);
+
   // O relógio só roda quando há um pedido na tela, e a cada 20s em vez de 1s:
   // os textos de ETA/progresso mudam por minuto, então 1s só causava re-render
   // do painel e do mapa inteiro a cada segundo (travava os cliques).
@@ -58,8 +86,11 @@ export function TrackingPanel() {
   }, [pedido]);
 
   const search = useMutation({
-    mutationFn: async () => {
-      if (!code.trim()) throw new Error("Digite o código de rastreio");
+    // O código pode vir por argumento (retomada depois de conectar) em vez do
+    // estado: assim a busca não depende do React já ter re-renderizado.
+    mutationFn: async (codigoRetomado?: string) => {
+      const code = (codigoRetomado ?? codeState).trim();
+      if (!code) throw new Error("Digite o código de rastreio");
 
       // O registro da consulta alimenta o "Rastreamento ao vivo" da CentralML.
       // Nunca pode quebrar a busca do cliente — por isso o catch silencioso.
@@ -122,6 +153,50 @@ export function TrackingPanel() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  /*
+   * Rastrear sem conta vai DIRETO autorizar no Mercado Livre.
+   *
+   * Compra do Mercado Livre só aparece na conta de quem comprou. Então, para
+   * quem ainda não entrou, o clique em "RASTREAR AGORA" não faz uma busca que
+   * sempre daria "não encontrado", nem manda preencher cadastro: leva para a
+   * mesma tela de autorização do botão "Conectar Mercado Livre".
+   *
+   * O acesso do Únific+ é criado no callback, a partir da conta que autorizou.
+   * O código digitado fica guardado para a busca ser refeita sozinha na volta.
+   */
+  const [indoParaMl, setIndoParaMl] = useState(false);
+
+  const rastrear = async () => {
+    if (autenticado) {
+      search.mutate(undefined);
+      return;
+    }
+
+    const digitado = code.trim();
+    if (!digitado) {
+      toast.error("Digite o código de rastreio");
+      return;
+    }
+
+    setIndoParaMl(true);
+    try {
+      sessionStorage.setItem("unific:rastreio-pendente", digitado);
+    } catch {
+      /* aba anônima: segue sem a retomada automática. */
+    }
+
+    try {
+      const { startMlConnectPublico } = await import("@/lib/ml.functions");
+      const { authorizationUrl } = await startMlConnectPublico();
+      window.location.href = authorizationUrl;
+    } catch (e) {
+      setIndoParaMl(false);
+      toast.error(
+        e instanceof Error ? e.message : "Não foi possível abrir a autorização do Mercado Livre.",
+      );
+    }
+  };
 
   const progress = pedido ? progressOf(pedido, tick) : 0;
   const movimentos = useMemo(
@@ -276,15 +351,16 @@ export function TrackingPanel() {
         </p>
       </div>
 
-      {/* Aviso informativo, NÃO bloqueia: o rastreio por código cadastrado
-          continua público. O login só é necessário para as compras do
-          Mercado Livre, que são buscadas na conta do próprio cliente. */}
+      {/* Explica o que vai acontecer ao clicar em rastrear sem estar logado:
+          o visitante é levado ao Mercado Livre para autorizar. Sem cadastro,
+          sem formulário — quem prefere entrar por e-mail e senha ainda tem o
+          link ao lado. */}
       {!autenticado && (
         <div className="mx-auto mt-5 max-w-2xl rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-center">
           <p className="text-xs text-muted-foreground">
-            Rastreando uma compra sua do Mercado Livre?{" "}
+            Ao rastrear, você autoriza o Únific+ na sua conta do Mercado Livre — sem criar cadastro.{" "}
             <Link to="/entrar" className="inline-flex items-center gap-1 font-bold text-primary underline">
-              <LogIn className="h-3 w-3" /> Entre na sua conta
+              <LogIn className="h-3 w-3" /> Já tenho conta
             </Link>
           </p>
         </div>
@@ -298,7 +374,7 @@ export function TrackingPanel() {
             value={code}
             maxLength={40}
             onChange={(e) => setCode(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && search.mutate()}
+            onKeyDown={(e) => e.key === "Enter" && void rastrear()}
             placeholder="Ex: 954321"
             className="mt-2 w-full rounded-md border border-input bg-white px-3 py-2.5 text-sm text-card-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
           />
@@ -324,12 +400,16 @@ export function TrackingPanel() {
         </div>
 
         <button
-          onClick={() => search.mutate()}
-          disabled={search.isPending}
+          onClick={() => void rastrear()}
+          disabled={search.isPending || indoParaMl}
           className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary py-3 font-display text-base font-bold tracking-wide text-primary-foreground transition-transform hover:scale-[1.01] disabled:opacity-60"
         >
           <PackageSearch className="h-5 w-5" />
-          {search.isPending ? "BUSCANDO..." : "RASTREAR AGORA"}
+          {indoParaMl
+            ? "ABRINDO O MERCADO LIVRE..."
+            : search.isPending
+              ? "BUSCANDO..."
+              : "RASTREAR AGORA"}
         </button>
 
         <p className="text-center text-xs font-bold text-destructive">

@@ -158,10 +158,45 @@ export const Route = createFileRoute("/api/public/ml/callback")({
         const mlUserId = String(me.id ?? tok.user_id ?? "");
         if (!mlUserId) return back("Não foi possível identificar a conta do Mercado Livre.");
 
-        // O dono vem do STATE, que foi gravado com a sessão validada no
-        // servidor quando o cliente clicou em conectar. Sem dono não há
-        // isolamento possível — recusamos em vez de criar conta órfã.
-        const ownerUserId = st.owner_user_id ? String(st.owner_user_id) : null;
+        /*
+         * Quem é o dono desta conexão?
+         *
+         * Fluxo logado: o dono veio no STATE, gravado com a sessão validada no
+         * servidor. Sem dono ali é sessão perdida — continua recusado, porque
+         * criar conexão órfã quebraria o isolamento entre clientes.
+         *
+         * Fluxo público (state com prefixo "pub-"): o visitante entrou pelo
+         * Mercado Livre, sem cadastro. Aqui o dono é criado a partir da própria
+         * conta que acabou de autorizar.
+         */
+        const { PREFIXO_STATE_PUBLICO } = await import("@/lib/ml-oauth");
+        const fluxoPublico = String(st.state ?? state).startsWith(PREFIXO_STATE_PUBLICO);
+
+        let ownerUserId = st.owner_user_id ? String(st.owner_user_id) : null;
+        let entrarComo: string | null = null;
+
+        if (!ownerUserId && fluxoPublico) {
+          const { garantirClientePorContaMl } = await import("@/lib/server/entrar-com-ml.server");
+          const r = await garantirClientePorContaMl({
+            mlUserId,
+            email: me.email ?? null,
+            nickname: me.nickname ?? null,
+            firstName: me.first_name ?? null,
+          });
+          if (!r.ok) {
+            await logEvent({
+              category: "oauth",
+              action: "oauth.entrar_com_ml_falhou",
+              success: false,
+              error: r.erro,
+              detail: { ml_user_id: mlUserId },
+            });
+            return back(r.erro);
+          }
+          ownerUserId = r.userId;
+          entrarComo = r.email;
+        }
+
         if (!ownerUserId) {
           await logEvent({
             category: "oauth",
@@ -249,6 +284,38 @@ export const Route = createFileRoute("/api/public/ml/callback")({
           void syncAccount(saved.id, { kind: "initial", trigger: "oauth", full: true }).catch((e) =>
             console.error("[ml/callback] sync inicial", e instanceof Error ? e.message : e),
           );
+        }
+
+        /*
+         * Fluxo público: além de conectar, precisa DEIXAR A PESSOA LOGADA.
+         *
+         * O link de acesso é gerado no servidor (service_role) e usado uma vez
+         * só, na hora — nada é enviado por e-mail e nenhuma senha trafega. Se
+         * a geração falhar, a conexão já está salva: mandamos para a tela de
+         * entrada em vez de perder o trabalho.
+         */
+        if (fluxoPublico && entrarComo) {
+          const { linkDeEntrada } = await import("@/lib/server/entrar-com-ml.server");
+          const destino = await linkDeEntrada(entrarComo, url.origin);
+          if (destino) {
+            await logEvent({
+              category: "oauth",
+              action: "oauth.entrou_com_ml",
+              accountId: saved?.id ?? null,
+              mlUserId,
+              actor: entrarComo,
+              message: `Visitante entrou pelo Mercado Livre como ${me.nickname ?? mlUserId}.`,
+            });
+            return new Response(null, { status: 302, headers: { Location: destino } });
+          }
+          return new Response(null, {
+            status: 302,
+            headers: {
+              Location: `/entrar?msg=${encodeURIComponent(
+                "Sua conta do Mercado Livre foi conectada. Entre para ver seus pedidos.",
+              )}`,
+            },
+          });
         }
 
         return back("Conta do Mercado Livre conectada!", true);

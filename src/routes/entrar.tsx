@@ -18,8 +18,27 @@ import {
 
 export const Route = createFileRoute("/entrar")({
   head: () => ({ meta: [{ title: "Entrar | Únific+" }] }),
+  // Parâmetros vindos do rastreio de quem ainda não tem conta:
+  // next=conectar abre já no modo "criar" e conecta o Mercado Livre no fim;
+  // codigo é o rastreio digitado, guardado para retomar a busca depois.
+  // As chaves saem OPCIONAIS (montadas só quando existem) para que os demais
+  // links para "/entrar" continuem válidos sem precisar informar search.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { next?: "conectar"; codigo?: string; msg?: string } => {
+    const saida: { next?: "conectar"; codigo?: string; msg?: string } = {};
+    if (search["next"] === "conectar") saida.next = "conectar";
+    if (typeof search["codigo"] === "string") saida.codigo = (search["codigo"] as string).slice(0, 40);
+    if (typeof search["msg"] === "string") saida.msg = (search["msg"] as string).slice(0, 300);
+    return saida;
+  },
   component: Entrar,
 });
+
+// Onde o código de rastreio fica guardado enquanto o cliente cria a conta e
+// conecta o Mercado Livre. O painel de rastreio lê essa chave ao voltar e
+// refaz a busca sozinho. sessionStorage: some ao fechar a aba, não vaza depois.
+export const CHAVE_RASTREIO_PENDENTE = "unific:rastreio-pendente";
 
 /**
  * Login/cadastro do CLIENTE.
@@ -30,9 +49,11 @@ export const Route = createFileRoute("/entrar")({
  */
 function Entrar() {
   const router = useRouter();
+  const { next, codigo, msg } = Route.useSearch();
   const { autenticado, email: emailSessao, carregando, sair } = useSessao();
 
-  const [modo, setModo] = useState<"entrar" | "criar">("entrar");
+  // Quem chega pelo botão de rastrear sem conta já cai no cadastro.
+  const [modo, setModo] = useState<"entrar" | "criar">(next === "conectar" ? "criar" : "entrar");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -47,10 +68,35 @@ function Entrar() {
 
   // Mensagem vinda de um redirect (ex.: tentou conectar sem estar logado).
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    const msg = p.get("msg");
     if (msg) setAviso(msg);
-  }, []);
+  }, [msg]);
+
+  // Guarda o código de rastreio para retomar a busca depois de conectar.
+  useEffect(() => {
+    if (!codigo) return;
+    try {
+      sessionStorage.setItem(CHAVE_RASTREIO_PENDENTE, codigo);
+    } catch {
+      /* aba anônima ou storage bloqueado: sem retomada automática, tudo bem. */
+    }
+  }, [codigo]);
+
+  /**
+   * Leva o cliente recém-logado para conectar o Mercado Livre.
+   *
+   * É o que faltava para "conectar primeiro": em vez de só voltar para a home,
+   * inicia o mesmo OAuth do botão "Conectar Mercado Livre". Se por algum
+   * motivo não iniciar, cai na home sem travar o cliente.
+   */
+  const seguirParaConexao = async () => {
+    try {
+      const { startMlConnect } = await import("@/lib/ml.functions");
+      const { authorizationUrl } = await startMlConnect();
+      window.location.href = authorizationUrl;
+    } catch {
+      void router.navigate({ to: "/" });
+    }
+  };
 
   /**
    * Confere o cadastro ANTES de criar a conta no Supabase.
@@ -129,8 +175,12 @@ function Entrar() {
 
     setOcupado(false);
 
-    const proximo = new URLSearchParams(window.location.search).get("next");
-    void router.navigate({ to: proximo === "conectar" ? "/" : "/" });
+    // Veio do rastreio sem conta: conecta o Mercado Livre agora. Senão, home.
+    if (next === "conectar") {
+      void seguirParaConexao();
+      return;
+    }
+    void router.navigate({ to: "/" });
   };
 
   if (carregando) {

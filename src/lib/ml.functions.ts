@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireUser } from "./auth-middleware";
+import { PREFIXO_STATE_PUBLICO } from "./ml-oauth";
 
 /**
  * OAuth do Mercado Livre — iniciado pelo CLIENTE LOGADO dentro do Unific+.
@@ -60,6 +61,69 @@ export const startMlConnect = createServerFn({ method: "POST" })
 
     return { authorizationUrl: url.toString() };
   });
+
+/**
+ * OAuth do Mercado Livre para quem AINDA NÃO TEM CONTA no Únific+.
+ *
+ * É o "entrar com o Mercado Livre": o visitante digita o código de rastreio,
+ * clica em rastrear e vai direto para a tela de autorização do Mercado Livre.
+ * Não há formulário de cadastro no caminho — o acesso do Únific+ é criado no
+ * callback, a partir da própria conta autorizada.
+ *
+ * SEM middleware de sessão, de propósito: é o único ponto público do OAuth.
+ * O que protege aqui é o `state` de uso único e com validade, igual ao fluxo
+ * logado — o visitante não escolhe nada além de autorizar (ou não) no
+ * Mercado Livre, e o token continua saindo apenas do backend.
+ */
+export const startMlConnectPublico = createServerFn({ method: "POST" }).handler(async () => {
+  const { getMlCredentials, getMlRedirectUri, isPkceEnabled } = await import("./server/config.server");
+  const { ML_AUTH_URL } = await import("./server/ml-api.server");
+  const { db } = await import("./server/db.server");
+
+  const { clientId } = getMlCredentials();
+  const redirectUri = getMlRedirectUri();
+
+  const state =
+    PREFIXO_STATE_PUBLICO +
+    crypto.randomUUID().replace(/-/g, "") +
+    crypto.randomUUID().replace(/-/g, "");
+  const usePkce = isPkceEnabled();
+  const codeVerifier = usePkce ? base64Url(crypto.getRandomValues(new Uint8Array(48))) : null;
+
+  // owner_user_id fica NULO: ainda não existe cliente. Quem preenche é o
+  // callback, depois de saber qual conta do Mercado Livre autorizou.
+  const { error } = await db("ml_oauth_states").insert({
+    state,
+    code_verifier: codeVerifier,
+    owner_user_id: null,
+    redirect_uri: redirectUri,
+    expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+  });
+  if (error) throw new Error("Não foi possível iniciar a conexão. Tente novamente.");
+
+  await db("ml_oauth_states").delete().lt("expires_at", new Date().toISOString());
+
+  const url = new URL(ML_AUTH_URL);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("state", state);
+  if (codeVerifier) {
+    url.searchParams.set("code_challenge", await sha256Base64Url(codeVerifier));
+    url.searchParams.set("code_challenge_method", "S256");
+  }
+
+  const { logEvent } = await import("./server/logs.server");
+  await logEvent({
+    category: "oauth",
+    action: "oauth.connect.iniciado_publico",
+    actor: "visitante",
+    message: "Visitante enviado ao OAuth do Mercado Livre sem cadastro prévio.",
+    detail: { redirect_uri: redirectUri, pkce: Boolean(codeVerifier) },
+  });
+
+  return { authorizationUrl: url.toString() };
+});
 
 /**
  * Status das conexões DO CLIENTE AUTENTICADO. Nunca expõe tokens.

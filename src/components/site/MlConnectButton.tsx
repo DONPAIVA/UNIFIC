@@ -82,6 +82,9 @@ export function MlConnectButton() {
         ) : !autenticado ? (
           <Link
             to="/entrar"
+            // Depois de entrar, segue direto para a autorização do Mercado
+            // Livre em vez de largar o cliente na home sem ter conectado.
+            search={{ next: "conectar" }}
             onClick={() => playClick()}
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-display text-base font-bold tracking-wide text-primary-foreground shadow-[0_10px_30px_-10px_rgba(0,0,0,.6)] transition-transform hover:scale-[1.03]"
           >
