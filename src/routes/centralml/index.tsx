@@ -302,65 +302,6 @@ function useAsync<T>(chave: unknown[], fn: () => Promise<T>, enabled = true): As
 /* Login                                                                      */
 /* ========================================================================== */
 
-/**
- * Sangue escorrendo da borda de baixo do cartão.
- *
- * Feito com divs em vez de imagem: escala em qualquer largura sem borrar, não
- * pesa no carregamento e acompanha o cartão quando ele encolhe no celular.
- *
- * Os pingos têm larguras, alturas e posições irregulares de propósito —
- * espaçamento uniforme denuncia que é enfeite e mata o efeito.
- *
- * `aria-hidden` e `pointer-events-none`: é decoração pura, não deve ser lida
- * por leitor de tela nem atrapalhar o clique nos campos.
- */
-function SangueEscorrendo() {
-  // esquerda %, largura px, altura px
-  const pingos: Array<[number, number, number]> = [
-    [4, 9, 16],
-    [11, 13, 30],
-    [19, 7, 11],
-    [27, 11, 22],
-    [36, 8, 38],
-    [45, 14, 18],
-    [54, 9, 27],
-    [62, 7, 13],
-    [70, 12, 34],
-    [79, 8, 20],
-    [87, 11, 15],
-    [94, 8, 25],
-  ];
-
-  return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0" aria-hidden="true">
-      <div className="relative">
-        {/* Poça na borda: dá o ponto de partida de onde o sangue escorre. */}
-        <div className="absolute inset-x-0 -bottom-[6px] h-[10px] rounded-b-lg bg-[#8B0000]" />
-
-        {pingos.map(([esquerda, largura, altura], i) => (
-          <span
-            key={i}
-            className="absolute rounded-b-full bg-[#8B0000]"
-            style={{
-              left: `${esquerda}%`,
-              width: `${largura}px`,
-              height: `${altura}px`,
-              bottom: `${-altura + 2}px`,
-            }}
-          />
-        ))}
-
-        {/* Duas gotas soltas, caindo em tempos diferentes. */}
-        <span className="animate-gota absolute left-[36%] -bottom-12 h-2.5 w-2 rounded-full bg-[#8B0000]" />
-        <span
-          className="animate-gota absolute left-[70%] -bottom-12 h-2 w-1.5 rounded-full bg-[#8B0000]"
-          style={{ animationDelay: "1.9s" }}
-        />
-      </div>
-    </div>
-  );
-}
-
 function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: string | null }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -430,9 +371,9 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
    * Safari no iPhone.
    */
   const campo =
-    "w-full rounded-lg border-2 border-[#FFE600] bg-white py-3 pl-11 pr-4 text-base text-zinc-900 " +
-    "placeholder:text-zinc-400 placeholder:text-[13px] placeholder:font-semibold " +
-    "placeholder:uppercase placeholder:tracking-wider outline-none transition " +
+    "w-full rounded-lg border-2 border-[#FFE600] bg-white py-3.5 pl-11 pr-4 text-base font-semibold text-zinc-900 " +
+    "placeholder:text-zinc-500 placeholder:text-[13px] placeholder:font-bold " +
+    "placeholder:uppercase placeholder:tracking-[0.12em] outline-none transition " +
     "focus:border-[#3483FA] focus:ring-2 focus:ring-[#3483FA]/20";
 
   return (
@@ -457,8 +398,6 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
         onSubmit={submit}
         className="relative w-full max-w-[23rem] rounded-xl border-2 border-[#FFE600] bg-white px-7 py-9 shadow-[0_10px_40px_rgba(0,0,0,0.55)] sm:px-9"
       >
-        <SangueEscorrendo />
-
         <div className="flex flex-col items-center text-center">
           <img
             src={mlLogo}
@@ -467,10 +406,10 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
             width={64}
             height={64}
           />
-          <h1 className="mt-5 text-[17px] font-black uppercase tracking-[0.18em] text-[#2D3277]">
+          <h1 className="mt-5 text-[21px] font-black uppercase leading-tight tracking-[0.12em] text-[#2D3277]">
             Olho de Deus ML
           </h1>
-          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
+          <p className="mt-2 text-[12px] font-bold uppercase tracking-[0.14em] text-zinc-500">
             Painel do Mercado Livre
           </p>
         </div>
@@ -536,7 +475,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
         <button
           type="submit"
           disabled={busy}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-[#3483FA] px-4 py-3.5 text-[15px] font-semibold text-white shadow-sm transition hover:bg-[#2968C8] disabled:opacity-60"
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-[#3483FA] px-4 py-3.5 text-[15px] font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-[#2968C8] disabled:opacity-60"
         >
           {busy ? (
             <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -552,13 +491,13 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
         <button
           type="button"
           onClick={() => void recuperarSenha()}
-          className="mt-3 w-full rounded-md bg-[#3483FA]/10 px-4 py-3 text-[15px] font-semibold text-[#3483FA] transition hover:bg-[#3483FA]/15"
+          className="mt-3 w-full rounded-md bg-[#3483FA]/10 px-4 py-3 text-[15px] font-bold text-[#3483FA] transition hover:bg-[#3483FA]/15"
         >
           Recuperar acesso
         </button>
 
         <div className="mt-7 border-t border-zinc-200 pt-4 text-center">
-          <p className="flex items-center justify-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-600">
+          <p className="flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-600">
             <ShieldCheck className="h-3 w-3" />
             Sistema protegido e monitorado
           </p>

@@ -250,13 +250,13 @@
 /* ---------------------------------------------------------------------------
    Sem zoom automatico ao tocar num campo (celular)
 
-   O Safari do iPhone da zoom sozinho quando o campo tem fonte menor que 16px —
-   e o painel usa text-xs/text-sm (12 a 14px) para caber mais coluna na tela.
-   O resultado e a pagina "pulando" a cada toque.
+   O Safari do iPhone aplica zoom sozinho quando o campo tem fonte menor que
+   16px, e o painel usa 12-14px para caber mais coluna. O resultado e a pagina
+   "pulando" a cada toque.
 
-   A solucao comum e travar o viewport com maximum-scale=1, mas isso tira o
-   pinch-to-zoom de quem enxerga mal. Aqui o campo so cresce para 16px em
-   aparelhos de toque; no computador a interface continua compacta.
+   A solucao comum e travar o viewport com maximum-scale=1, mas isso remove o
+   pinch-to-zoom de quem enxerga mal. Aqui o campo so cresce em aparelhos de
+   toque; no computador a interface continua compacta.
 --------------------------------------------------------------------------- */
 @media (hover: none) and (pointer: coarse) {
   input,
@@ -264,28 +264,4 @@
   textarea {
     font-size: 16px;
   }
-}
-
-/* ---------------------------------------------------------------------------
-   Gota de sangue caindo (tela de login do painel)
-
-   Fica invisivel quase o tempo todo e cai rapido: gota escorrendo sem parar
-   vira ruido visual. O intervalo longo entre uma queda e outra e o que faz o
-   efeito parecer real em vez de animacao em laco.
-
-   prefers-reduced-motion respeitado: quem pediu menos movimento no sistema
-   ve os pingos parados, sem a queda.
---------------------------------------------------------------------------- */
-@keyframes gota-sangue {
-  0%, 82%   { transform: translateY(0); opacity: 0; }
-  84%       { opacity: 1; }
-  100%      { transform: translateY(52px); opacity: 0; }
-}
-
-.animate-gota {
-  animation: gota-sangue 4.5s ease-in infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-gota { animation: none; opacity: 0; }
 }
