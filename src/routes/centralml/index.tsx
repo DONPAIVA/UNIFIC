@@ -196,7 +196,7 @@ function Panel({ title, right, children }: { title: string; right?: React.ReactN
     <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.18)]">
       <div className="h-1 w-full bg-[#FFE600]" />
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
-        <h2 className="flex items-center gap-2.5 text-sm font-black uppercase tracking-wide text-[#2D3277]">
+        <h2 className="flex items-center gap-2.5 text-sm font-black uppercase tracking-wide text-[#3483FA]">
           <span className="h-4 w-1 rounded-full bg-[#FFE600]" />
           {title}
         </h2>
@@ -213,7 +213,7 @@ function Panel({ title, right, children }: { title: string; right?: React.ReactN
  */
 function Stat({ label, value, tone = "default" }: { label: string; value: React.ReactNode; tone?: "default" | "alert" | "ok" }) {
   const toneClass =
-    tone === "alert" ? "text-red-700" : tone === "ok" ? "text-emerald-700" : "text-[#2D3277]";
+    tone === "alert" ? "text-red-700" : tone === "ok" ? "text-emerald-700" : "text-[#3483FA]";
   return (
     <div className="rounded-xl border-2 border-[#FFE600] bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.18)]">
       <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">{label}</p>
@@ -269,7 +269,7 @@ function Table({ head, children }: { head: string[]; children: React.ReactNode }
     <div className="overflow-x-auto rounded-lg border border-zinc-200">
       <table className="w-full min-w-[720px] text-left text-sm">
         <thead>
-          <tr className="border-b-2 border-[#FFE600] bg-[#FFFBE0] text-[11px] uppercase tracking-wide text-[#2D3277]">
+          <tr className="border-b-2 border-[#FFE600] bg-[#FFFBE0] text-[11px] uppercase tracking-wide text-[#3483FA]">
             {head.map((h) => (
               <th key={h} className="whitespace-nowrap px-2 py-2.5 font-black">
                 {h}
@@ -659,14 +659,22 @@ function CentralML() {
         <header className="sticky top-0 z-40 border-b-4 border-[#2D3277] bg-[#FFE600] px-4 py-3 shadow-lg">
           <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <LogoML className="h-10 w-10 drop-shadow-sm" />
+              {/* Mesma logo da tela de login — a marca fica igual da entrada
+                  ao painel, sem troca de desenho no meio do caminho. */}
+              <img
+                src={mlLogo}
+                alt="Mercado Livre"
+                className="h-10 w-10 rounded-xl shadow-sm"
+                width={40}
+                height={40}
+              />
               <div className="leading-none">
-                <span className="block text-xl font-black tracking-tight text-[#2d3277]">OLHO DE DEUS ML</span>
-                <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wider text-black/55">
-                  Únific+ · painel do Mercado Livre
+                <span className="block text-xl font-black tracking-tight text-[#2D3277]">OLHO DE DEUS ML</span>
+                <span className="mt-0.5 block text-[10px] font-black uppercase tracking-[0.16em] text-[#2D3277]/70">
+                  Painel do Mercado Livre
                 </span>
               </div>
-              <Badge className="ml-1 border-[#2d3277]/25 bg-[#2d3277]/10 text-[#2d3277]">
+              <Badge className="ml-1 border-[#2D3277]/25 bg-[#2D3277]/10 text-[#2D3277]">
                 {session.isAdmin ? "Administrador" : "Meu painel"}
               </Badge>
             </div>
@@ -709,7 +717,7 @@ function CentralML() {
                             // de cores do Mercado Livre e destaca mais que o azul
                             // cheio, que competia com os botões de ação.
                             "border-[#FFE600] bg-[#FFE600] text-[#2D3277] shadow-sm"
-                          : "border-zinc-200 bg-white text-zinc-600 hover:border-[#FFE600] hover:text-[#2D3277]"
+                          : "border-zinc-200 bg-white text-zinc-600 hover:border-[#FFE600] hover:text-[#3483FA]"
                       }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
