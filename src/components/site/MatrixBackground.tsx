@@ -62,20 +62,23 @@ export function MatrixBackground() {
         const x = i * TAMANHO;
         const y = (gotas[i] ?? 0) * TAMANHO;
 
-        // Cabeça da coluna: quase branca, com brilho — é o que dá o visual clássico.
-        ctx.shadowColor = "#00ff6a";
+        /*
+         * Amarelo do Mercado Livre (#FFE600) no lugar do verde clássico.
+         * A cabeca fica quase branca puxando para o amarelo, o corpo no tom
+         * cheio da marca e a cauda apagada — a mesma leitura de profundidade
+         * do original, na cor do site.
+         */
+        ctx.shadowColor = "#FFE600";
         ctx.shadowBlur = 10;
-        ctx.fillStyle = "#d8ffe6";
+        ctx.fillStyle = "#fffbd6";
         ctx.fillText(glifo(), x, y);
 
-        // Corpo logo acima da cabeça, em verde forte.
         ctx.shadowBlur = 5;
-        ctx.fillStyle = "#00ff6a";
+        ctx.fillStyle = "#FFE600";
         ctx.fillText(glifo(), x, y - TAMANHO);
 
-        // Cauda mais apagada.
         ctx.shadowBlur = 0;
-        ctx.fillStyle = "rgba(0, 200, 80, 0.55)";
+        ctx.fillStyle = "rgba(214, 193, 0, 0.55)";
         ctx.fillText(glifo(), x, y - TAMANHO * 2);
 
         gotas[i] = (gotas[i] ?? 0) + (velocidades[i] ?? 1);
