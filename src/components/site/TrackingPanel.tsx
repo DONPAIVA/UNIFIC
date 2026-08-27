@@ -4,7 +4,8 @@ import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, FileText, LogIn, MessageSquareWarning, PackageSearch, Truck } from "lucide-react";
 import { MARKETPLACES, getMarketplace } from "@/lib/marketplaces";
-import { findPedido, insertTable } from "@/lib/api";
+import { findPedido, findPedidosByCpf, insertTable } from "@/lib/api";
+import { digitos, formatarCpf } from "@/lib/cpf";
 import { rastrearMinhaCompraCompleta } from "@/lib/minha-conta.functions";
 import { registrarConsultaRastreio } from "@/lib/rastreio.functions";
 import { useSessao } from "@/lib/useSessao";
@@ -45,6 +46,8 @@ export function TrackingPanel() {
   const [eventosReais, setEventosReais] = useState<Movimento[] | null>(null);
   const [tick, setTick] = useState(Date.now());
   const [view, setView] = useState<"map" | "nf" | "reclamacao">("map");
+  // Quando o CPF tem mais de um pedido, o cliente escolhe qual acompanhar.
+  const [escolhas, setEscolhas] = useState<Pedido[] | null>(null);
   const hydrated = useHydrated();
 
   useEffect(() => {
@@ -154,6 +157,43 @@ export function TrackingPanel() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /**
+   * Busca os pedidos cadastrados no CPF informado.
+   *
+   * Um resultado abre direto; vários viram uma lista para o cliente escolher.
+   * Vale só para os rastreios cadastrados no painel (tabela `pedidos`) — as
+   * compras do Mercado Livre não têm CPF, elas vêm pela conta conectada.
+   */
+  const buscaPorCpf = useMutation({
+    mutationFn: async (cpf: string) => {
+      const encontrados = await findPedidosByCpf(cpf);
+      if (!encontrados.length) {
+        throw new Error("Nenhum rastreio cadastrado para este CPF.");
+      }
+      return encontrados;
+    },
+    onSuccess: (encontrados) => {
+      const primeiro = encontrados[0];
+      if (encontrados.length === 1 && primeiro) {
+        abrirPedido(primeiro);
+        toast.success(`Pedido ${primeiro.tracking_code} localizado!`);
+        return;
+      }
+      setEscolhas(encontrados);
+      toast.success(`${encontrados.length} pedidos encontrados neste CPF.`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  /** Coloca um pedido na tela, venha ele da busca por código ou por CPF. */
+  const abrirPedido = (p: Pedido) => {
+    setEscolhas(null);
+    setEventosReais(null);
+    setPedido(p);
+    setMp(p.marketplace);
+    setView("map");
+  };
+
   /*
    * Rastrear sem conta vai DIRETO autorizar no Mercado Livre.
    *
@@ -168,14 +208,31 @@ export function TrackingPanel() {
   const [indoParaMl, setIndoParaMl] = useState(false);
 
   const rastrear = async () => {
+    const digitado = code.trim();
+
+    /*
+     * O mesmo campo aceita código de rastreio OU CPF.
+     *
+     * O gatilho é ter 11 dígitos — e o CPF inteiro é exigido de propósito:
+     * aceitar parte dele transformaria o campo numa varredura, dando para
+     * tentar sequências até cair no pedido de alguém.
+     *
+     * Não exigimos os dígitos verificadores porque há CPF já cadastrado no
+     * painel que não passa nessa conta; a validação recusaria pedido real.
+     */
+    const soDigitos = digitos(digitado);
+    if (soDigitos.length === 11) {
+      buscaPorCpf.mutate(soDigitos);
+      return;
+    }
+
     if (autenticado) {
       search.mutate(undefined);
       return;
     }
 
-    const digitado = code.trim();
     if (!digitado) {
-      toast.error("Digite o código de rastreio");
+      toast.error("Digite o código de rastreio ou o CPF");
       return;
     }
 
@@ -368,14 +425,23 @@ export function TrackingPanel() {
 
       <div className="mx-auto mt-6 max-w-2xl space-y-5">
         <div>
-          <label htmlFor="code" className="text-sm font-bold">1. Digite seu código de rastreio:</label>
+          <label htmlFor="code" className="text-sm font-bold">
+            1. Digite seu código de rastreio ou seu CPF:
+          </label>
           <input
             id="code"
             value={code}
             maxLength={40}
-            onChange={(e) => setCode(e.target.value)}
+            /* Só formata quando o que foi digitado é claramente um CPF: um
+               código de rastreio pode ter números, e pontuar ele atrapalharia. */
+            onChange={(e) => {
+              const bruto = e.target.value;
+              const so = digitos(bruto);
+              const pareceCpf = so.length >= 4 && so.length <= 11 && /^[\d.\-\s]*$/.test(bruto);
+              setCode(pareceCpf ? formatarCpf(so) : bruto);
+            }}
             onKeyDown={(e) => e.key === "Enter" && void rastrear()}
-            placeholder="Ex: 954321"
+            placeholder="Ex: 954321 ou 123.456.789-09"
             className="mt-2 w-full rounded-md border border-input bg-white px-3 py-2.5 text-sm text-card-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
           />
         </div>
@@ -401,16 +467,42 @@ export function TrackingPanel() {
 
         <button
           onClick={() => void rastrear()}
-          disabled={search.isPending || indoParaMl}
+          disabled={search.isPending || buscaPorCpf.isPending || indoParaMl}
           className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary py-3 font-display text-base font-bold tracking-wide text-primary-foreground transition-transform hover:scale-[1.01] disabled:opacity-60"
         >
           <PackageSearch className="h-5 w-5" />
           {indoParaMl
             ? "ABRINDO O MERCADO LIVRE..."
-            : search.isPending
+            : search.isPending || buscaPorCpf.isPending
               ? "BUSCANDO..."
               : "RASTREAR AGORA"}
         </button>
+
+        {/* Vários pedidos no mesmo CPF: o cliente escolhe qual acompanhar. */}
+        {escolhas && escolhas.length > 0 && (
+          <div className="rounded-lg border border-border p-3">
+            <p className="text-sm font-bold">
+              {escolhas.length} pedidos neste CPF — escolha qual acompanhar:
+            </p>
+            <ul className="mt-2 space-y-2">
+              {escolhas.map((p) => (
+                <li key={p.id ?? p.tracking_code}>
+                  <button
+                    onClick={() => abrirPedido(p)}
+                    className="w-full rounded-md border border-border px-3 py-2 text-left text-sm transition-colors hover:border-primary hover:bg-primary/5"
+                  >
+                    <span className="font-bold">{p.tracking_code}</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {getMarketplace(p.marketplace).name}
+                      {p.product ? ` · ${p.product}` : ""}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <p className="text-center text-xs font-bold text-destructive">
           * Caso não tenha o código, pedir ao seu vendedor!

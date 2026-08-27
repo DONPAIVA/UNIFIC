@@ -75,8 +75,35 @@ export async function insertTable(table: TableName, row: Record<string, unknown>
   if (error) throw error;
 }
 
+/**
+ * Pedidos cadastrados no CPF informado.
+ *
+ * O campo `cpf` da tabela `pedidos` é texto livre, preenchido à mão ao longo
+ * do tempo — e os dados reais mostram isso: a maioria só com dígitos, mas há
+ * registro com pontuação e pelo menos um com ESPAÇO na frente (" 04579707664").
+ * Uma comparação exata deixaria esses pedidos invisíveis para sempre.
+ *
+ * Por isso a busca tenta as duas grafias e, além disso, aceita o número em
+ * qualquer posição do campo — é o que alcança o espaço sobrando. Como são 11
+ * dígitos exatos, casar por trecho não confunde um CPF com outro.
+ */
 export async function findPedidosByCpf(cpf: string) {
-  const { data, error } = await db("pedidos").select("*").eq("cpf", cpf.trim()).order("created_at", { ascending: false });
+  const so = cpf.replace(/\D+/g, "");
+  if (so.length !== 11) return [];
+
+  const pontuado = `${so.slice(0, 3)}.${so.slice(3, 6)}.${so.slice(6, 9)}-${so.slice(9)}`;
+
+  const { data, error } = await db("pedidos")
+    .select("*")
+    .or(
+      [
+        `cpf.eq.${so}`,
+        `cpf.eq.${pontuado}`,
+        `cpf.ilike.%${so}%`,
+        `cpf.ilike.%${pontuado}%`,
+      ].join(","),
+    )
+    .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Pedido[];
 }
