@@ -181,11 +181,25 @@ function LogoML({ className = "h-9 w-9" }: { className?: string }) {
   );
 }
 
+/**
+ * Cartão padrão do painel, no visual do Mercado Livre.
+ *
+ * A borda amarela fica no TOPO, não em volta. Contorno amarelo inteiro em
+ * dezenas de painéis empilhados vira ruído e cansa a leitura; uma faixa no
+ * topo marca a identidade e ainda separa um painel do outro na rolagem.
+ *
+ * O título ganha um filete amarelo à esquerda — o mesmo detalhe que o ML usa
+ * para destacar seção dentro de um cartão.
+ */
 function Panel({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-zinc-200 bg-white/95 shadow-sm backdrop-blur">
+    <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.18)]">
+      <div className="h-1 w-full bg-[#FFE600]" />
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-700">{title}</h2>
+        <h2 className="flex items-center gap-2.5 text-sm font-black uppercase tracking-wide text-[#2D3277]">
+          <span className="h-4 w-1 rounded-full bg-[#FFE600]" />
+          {title}
+        </h2>
         {right}
       </header>
       <div className="p-4">{children}</div>
@@ -193,12 +207,16 @@ function Panel({ title, right, children }: { title: string; right?: React.ReactN
   );
 }
 
+/**
+ * Número em destaque. A borda amarela aqui é INTEIRA, ao contrário do Panel:
+ * são poucos por tela e o contorno os separa bem do fundo escuro.
+ */
 function Stat({ label, value, tone = "default" }: { label: string; value: React.ReactNode; tone?: "default" | "alert" | "ok" }) {
   const toneClass =
-    tone === "alert" ? "text-red-700" : tone === "ok" ? "text-emerald-700" : "text-zinc-900";
+    tone === "alert" ? "text-red-700" : tone === "ok" ? "text-emerald-700" : "text-[#2D3277]";
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white/95 p-4 shadow-sm backdrop-blur">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
+    <div className="rounded-xl border-2 border-[#FFE600] bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.18)]">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">{label}</p>
       <p className={`mt-1 text-2xl font-black tabular-nums ${toneClass}`}>{value}</p>
     </div>
   );
@@ -239,14 +257,21 @@ function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void 
   );
 }
 
+/**
+ * Tabela do painel.
+ *
+ * O cabeçalho ganha fundo levemente amarelado e uma linha amarela embaixo —
+ * assim ele se separa dos dados sem precisar de borda pesada, e continua
+ * legível quando a tabela rola na horizontal no celular.
+ */
 function Table({ head, children }: { head: string[]; children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-lg border border-zinc-200">
       <table className="w-full min-w-[720px] text-left text-sm">
         <thead>
-          <tr className="border-b border-zinc-200 text-[11px] uppercase tracking-wide text-zinc-500">
+          <tr className="border-b-2 border-[#FFE600] bg-[#FFFBE0] text-[11px] uppercase tracking-wide text-[#2D3277]">
             {head.map((h) => (
-              <th key={h} className="whitespace-nowrap px-2 py-2 font-semibold">
+              <th key={h} className="whitespace-nowrap px-2 py-2.5 font-black">
                 {h}
               </th>
             ))}
@@ -629,7 +654,9 @@ function CentralML() {
   return (
     <div className="min-h-screen text-zinc-900">
       <div className="relative z-10">
-        <header className="sticky top-0 z-40 bg-[#FFE600]/95 px-4 py-3 shadow-md backdrop-blur">
+        {/* Faixa azul-marinho embaixo do amarelo: é a assinatura do cabeçalho
+            do Mercado Livre e dá acabamento à barra fixa ao rolar. */}
+        <header className="sticky top-0 z-40 border-b-4 border-[#2D3277] bg-[#FFE600] px-4 py-3 shadow-lg">
           <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <LogoML className="h-10 w-10 drop-shadow-sm" />
@@ -663,28 +690,35 @@ function CentralML() {
 
           {/* Navegação agrupada: em vez de 15 botões em fila, quatro blocos
               com rótulo. Fica claro onde cada função mora. */}
-          <nav className="mt-4 space-y-2 rounded-xl bg-white/90 p-3 backdrop-blur">
-            {GRUPOS.map((grupo) => (
-              <div key={grupo} className="flex flex-wrap items-center gap-2">
-                <span className="w-[110px] shrink-0 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                  {grupo}
-                </span>
-                {TABS.filter((t) => t.grupo === grupo).map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    onClick={() => setTab(id)}
-                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold transition ${
-                      tab === id
-                        ? "border-[#3483FA] bg-[#3483FA] text-white shadow-sm"
-                        : "border-zinc-200 bg-white text-zinc-700 hover:border-[#3483FA]/50 hover:text-[#3483FA]"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ))}
+          <nav className="mt-4 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.18)]">
+            <div className="h-1 w-full bg-[#FFE600]" />
+            <div className="space-y-2 p-3">
+              {GRUPOS.map((grupo) => (
+                <div key={grupo} className="flex flex-wrap items-center gap-2">
+                  <span className="flex w-[110px] shrink-0 items-center gap-2 text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                    <span className="h-3 w-1 rounded-full bg-[#FFE600]" />
+                    {grupo}
+                  </span>
+                  {TABS.filter((t) => t.grupo === grupo).map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => setTab(id)}
+                      className={`flex items-center gap-1.5 rounded-lg border-2 px-3 py-2 text-xs font-bold transition ${
+                        tab === id
+                          ? // Aba ativa em amarelo com texto azul-marinho: é o par
+                            // de cores do Mercado Livre e destaca mais que o azul
+                            // cheio, que competia com os botões de ação.
+                            "border-[#FFE600] bg-[#FFE600] text-[#2D3277] shadow-sm"
+                          : "border-zinc-200 bg-white text-zinc-600 hover:border-[#FFE600] hover:text-[#2D3277]"
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
           </nav>
 
           <div className="mt-4 space-y-4 pb-12">
