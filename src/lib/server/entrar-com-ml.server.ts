@@ -125,26 +125,16 @@ export async function garantirClientePorContaMl(conta: {
   const userId = String(criado.user.id);
 
   /*
-   * Perfil mínimo, para o cliente aparecer no painel de clientes.
+   * NÃO criamos linha em `clientes_perfil` aqui.
    *
-   * Nome vem do Mercado Livre; telefone e CPF ficam vazios — o visitante não
-   * preencheu formulário nenhum. É a diferença esperada entre quem entrou pelo
-   * Mercado Livre e quem se cadastrou pelo site.
+   * Aquela tabela exige CPF e telefone (NOT NULL, com formato conferido e CPF
+   * único). Quem entra pelo Mercado Livre não informa nenhum dos dois, e
+   * inventar número para satisfazer a restrição seria pior do que não ter o
+   * registro: sujaria o cadastro com dado falso.
+   *
+   * Quem lista os clientes é que passa a enxergar as duas origens — o cadastro
+   * pelo site e a conta que chegou pelo Mercado Livre. Ver `adminClientes`.
    */
-  await db("clientes_perfil")
-    .upsert(
-      {
-        user_id: userId,
-        email,
-        nome_completo: conta.firstName || conta.nickname || "Cliente Mercado Livre",
-        criado_em: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    )
-    .then(
-      () => undefined,
-      () => undefined, // perfil é conveniência: falhar aqui não desfaz a entrada
-    );
 
   return { ok: true, userId, email };
 }

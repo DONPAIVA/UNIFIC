@@ -231,21 +231,96 @@ export const adminClientes = createServerFn({ method: "GET" })
       }
     }
 
+    const comCadastro = (linhas ?? []).map((c: any) => ({
+      userId: String(c.user_id),
+      nome: c.nome_completo as string,
+      email: (c.email as string) ?? null,
+      telefone: (c.telefone as string) ?? null,
+      cpfMascarado: mascararCpf(c.cpf),
+      temPin: Boolean(c.pin_hash),
+      criadoEm: (c.criado_em as string) ?? null,
+      ultimoAcessoEm: (c.ultimo_acesso_em as string) ?? null,
+      contasMl: contasPorDono.get(String(c.user_id)) ?? [],
+      bloqueado: bloqueados.has(String(c.user_id)),
+      motivoBloqueio: bloqueados.get(String(c.user_id)) ?? null,
+      origem: "cadastro" as const,
+    }));
+
+    /*
+     * Clientes que entraram PELO MERCADO LIVRE não têm linha em
+     * `clientes_perfil`: aquela tabela exige CPF e telefone, e quem autoriza o
+     * app pelo Mercado Livre não preenche formulário nenhum.
+     *
+     * Sem este trecho eles ficam invisíveis aqui — a conta conecta, sincroniza
+     * e mesmo assim não aparece na lista, que foi exatamente o que aconteceu.
+     * Então buscamos também os donos de conexão sem cadastro e os montamos a
+     * partir do que o próprio Mercado Livre informou.
+     */
+    const jaListados = new Set(comCadastro.map((c: { userId: string }) => c.userId));
+
+    const { data: conexoes } = await admin
+      .from("ml_connections")
+      .select("owner_user_id, nickname, email, first_name, connected_at, created_at, last_activity_at")
+      .eq("provider", "mercado_livre")
+      .not("owner_user_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    const semCadastro = new Map<string, any>();
+    for (const c of conexoes ?? []) {
+      const dono = String((c as any).owner_user_id);
+      if (jaListados.has(dono) || semCadastro.has(dono)) continue;
+
+      const nome = ((c as any).first_name || (c as any).nickname || "Cliente Mercado Livre") as string;
+      const email = ((c as any).email as string) ?? null;
+
+      // O filtro de busca também vale aqui; CPF e telefone não existem
+      // para estes clientes, então só nome e e-mail podem casar.
+      if (data.q) {
+        const termo = data.q.toLowerCase();
+        const casa =
+          nome.toLowerCase().includes(termo) || (email ?? "").toLowerCase().includes(termo);
+        if (!casa) continue;
+      }
+
+      semCadastro.set(dono, {
+        userId: dono,
+        nome,
+        email,
+        telefone: null,
+        cpfMascarado: null,
+        temPin: false,
+        criadoEm: ((c as any).connected_at as string) ?? ((c as any).created_at as string) ?? null,
+        ultimoAcessoEm: ((c as any).last_activity_at as string) ?? null,
+        contasMl: contasPorDono.get(dono) ?? [(c as any).nickname ?? "conta ML"],
+        bloqueado: false,
+        motivoBloqueio: null,
+        origem: "mercado_livre" as const,
+      });
+    }
+
+    // O bloqueio vale para os dois tipos: quem entrou pelo Mercado Livre
+    // também pode estar barrado, e precisa aparecer assim na lista.
+    const idsSemCadastro = [...semCadastro.keys()];
+    if (idsSemCadastro.length) {
+      const { data: bl } = await admin
+        .from("clientes_bloqueados")
+        .select("user_id, motivo")
+        .in("user_id", idsSemCadastro);
+      for (const b of bl ?? []) {
+        const alvo = semCadastro.get(String((b as any).user_id));
+        if (alvo) {
+          alvo.bloqueado = true;
+          alvo.motivoBloqueio = (b as any).motivo ?? null;
+        }
+      }
+    }
+
+    const extras = [...semCadastro.values()];
+
     return {
-      total: count ?? 0,
-      clientes: (linhas ?? []).map((c: any) => ({
-        userId: c.user_id,
-        nome: c.nome_completo,
-        email: c.email,
-        telefone: c.telefone,
-        cpfMascarado: mascararCpf(c.cpf),
-        temPin: Boolean(c.pin_hash),
-        criadoEm: c.criado_em,
-        ultimoAcessoEm: c.ultimo_acesso_em,
-        contasMl: contasPorDono.get(String(c.user_id)) ?? [],
-        bloqueado: bloqueados.has(String(c.user_id)),
-        motivoBloqueio: bloqueados.get(String(c.user_id)) ?? null,
-      })),
+      total: (count ?? 0) + extras.length,
+      clientes: [...comCadastro, ...extras],
     };
   });
 

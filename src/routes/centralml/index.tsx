@@ -2456,6 +2456,16 @@ function ClientesTab() {
               <tr key={c.userId} className={`border-t border-zinc-100 ${c.bloqueado ? "bg-red-50/60" : ""}`}>
                 <td className="px-2 py-2 text-xs font-semibold">
                   {c.nome}
+                  {/* Entrou autorizando pelo Mercado Livre, sem preencher
+                      cadastro — por isso não tem CPF, telefone nem PIN. */}
+                  {c.origem === "mercado_livre" && (
+                    <span
+                      className="ml-2 rounded bg-[#FFE600] px-1.5 py-0.5 text-[10px] font-bold text-[#2D3277]"
+                      title="Entrou autorizando pelo Mercado Livre, sem preencher cadastro."
+                    >
+                      VIA ML
+                    </span>
+                  )}
                   {c.bloqueado && (
                     <span
                       className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700"
@@ -2466,9 +2476,13 @@ function ClientesTab() {
                   )}
                 </td>
                 <td className="px-2 py-2 text-xs">{c.email || "—"}</td>
-                <td className="px-2 py-2 text-xs">{formatarTelefone(c.telefone)}</td>
+                <td className="px-2 py-2 text-xs">
+                  {c.telefone ? formatarTelefone(c.telefone) : "—"}
+                </td>
                 <td className="px-2 py-2 font-mono text-xs">
-                  {cpfsAbertos[c.userId] ? (
+                  {!c.cpfMascarado ? (
+                    <span className="text-zinc-600">—</span>
+                  ) : cpfsAbertos[c.userId] ? (
                     <span className="text-zinc-900">{cpfsAbertos[c.userId]}</span>
                   ) : (
                     <button
