@@ -9,7 +9,51 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/api/public/ml/callback")({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: async (ctx) => {
+        /*
+         * Blindagem do retorno do Mercado Livre.
+         *
+         * Esta rota é o caminho de VOLTA do cliente. Qualquer erro solto aqui
+         * derruba o visitante na tela de falha do aplicativo ("Try again / Go
+         * home", sobre o fundo azul) — no meio de uma autorização, sem
+         * explicação e sem saber se a conta conectou.
+         *
+         * Então nada escapa: falha inesperada vira um redirect para a home com
+         * a mensagem, e o motivo real fica no log do servidor para diagnóstico.
+         */
+        try {
+          return await tratarCallback(ctx.request);
+        } catch (e) {
+          const motivo = e instanceof Error ? e.message : String(e);
+          console.error("[ml/callback] erro nao tratado", motivo);
+          try {
+            const { logEvent } = await import("@/lib/server/logs.server");
+            await logEvent({
+              category: "oauth",
+              action: "oauth.callback.erro_inesperado",
+              endpoint: "/api/public/ml/callback",
+              method: "GET",
+              success: false,
+              error: motivo,
+            });
+          } catch {
+            /* nem o log pode impedir o cliente de voltar para o site */
+          }
+          return new Response(null, {
+            status: 302,
+            headers: {
+              Location: `/?ml=erro&msg=${encodeURIComponent(
+                "Não foi possível concluir a autorização. Tente novamente.",
+              )}`,
+            },
+          });
+        }
+      },
+    },
+  },
+});
+
+async function tratarCallback(request: Request): Promise<Response> {
         const url = new URL(request.url);
         const code = url.searchParams.get("code");
         const state = url.searchParams.get("state");
@@ -319,7 +363,4 @@ export const Route = createFileRoute("/api/public/ml/callback")({
         }
 
         return back("Conta do Mercado Livre conectada!", true);
-      },
-    },
-  },
-});
+}
