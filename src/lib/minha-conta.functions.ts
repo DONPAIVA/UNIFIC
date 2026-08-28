@@ -16,7 +16,7 @@ import { requireUser, type Requester } from "./auth-middleware";
 async function minhasContas(user: Requester) {
   const { db } = await import("./server/db.server");
   const { data } = await db("ml_connections")
-    .select("id, ml_user_id, nickname, status, last_sync_at, expires_at, site_id")
+    .select("id, ml_user_id, nickname, status, last_sync_at, expires_at, site_id, updated_at")
     .eq("provider", "mercado_livre")
     .eq("owner_user_id", user.userId)
     .order("created_at", { ascending: false });
@@ -28,6 +28,9 @@ async function minhasContas(user: Requester) {
     last_sync_at: string | null;
     expires_at: string | null;
     site_id: string | null;
+    // Momento da última mudança de estado. É por ele que se distingue uma
+    // sincronização em andamento de uma que morreu no meio e ficou parada.
+    updated_at: string | null;
   }>;
 }
 
@@ -135,13 +138,30 @@ export const minhaConexao = createServerFn({ method: "GET" })
       totalPedidos = count ?? 0;
     }
 
+    /*
+     * Uma sincronização que não termina fica marcada como "syncing" para
+     * sempre: o sucesso grava "active" e o erro grava "error", mas se o
+     * processo morre no meio — reinício do servidor, por exemplo — ninguém
+     * grava nada. A sincronização inicial roda solta, sem ninguém esperando,
+     * então é justamente a que mais some assim.
+     *
+     * Depois de alguns minutos paradas, tratamos como travada. Sem isso o
+     * cliente ficaria eternamente "sincronizando" e sem poder rastrear.
+     */
+    const LIMITE_SINCRONIZACAO_MS = 5 * 60 * 1000;
+    const marcadoSincronizando = ativa?.status === "syncing";
+    const desdeMs = ativa?.updated_at ? Date.now() - new Date(ativa.updated_at).getTime() : 0;
+    const travada = marcadoSincronizando && desdeMs > LIMITE_SINCRONIZACAO_MS;
+
     return {
       conectado: Boolean(ativa),
       precisaReconectar,
       nickname: ativa?.nickname ?? null,
       mlUserId: ativa?.ml_user_id ?? null,
       ultimaSincronizacao: ativa?.last_sync_at ?? null,
-      sincronizando: ativa?.status === "syncing",
+      // Só conta como "sincronizando agora" o que ainda está dentro do prazo.
+      sincronizando: marcadoSincronizando && !travada,
+      sincronizacaoTravada: travada,
       totalPedidos,
     };
   });

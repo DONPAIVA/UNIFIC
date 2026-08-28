@@ -67,7 +67,13 @@ export function TrackingPanel() {
   });
 
   const conectado = Boolean(conexao.data?.conectado);
-  // Primeira sincronização ainda rodando: conectado, mas sem dados por enquanto.
+  /*
+   * Primeira sincronização ainda em curso: conectado, mas sem dados ainda.
+   *
+   * `sincronizando` já vem descontando a sincronização que travou — uma que
+   * morreu no meio ficaria marcada assim para sempre, e prender o rastreio
+   * nela deixaria o cliente sem conseguir buscar nada, sem saída.
+   */
   const primeiraSincronizacao =
     conectado && Boolean(conexao.data?.sincronizando) && !conexao.data?.ultimaSincronizacao;
   const liberado = conectado && !primeiraSincronizacao;
