@@ -4,12 +4,34 @@ import type { Pedido } from "./tracking";
 
 const db = (table: string) => (supabase as any).from(table);
 
+/**
+ * Busca um rastreio pelo código.
+ *
+ * Dois cuidados que a versão anterior não tinha, e que faziam um código
+ * EXISTENTE aparecer como "não encontrado":
+ *
+ * 1) `maybeSingle()` devolve erro quando mais de uma linha casa. Bastava um
+ *    código repetido no cadastro para a busca falhar em vez de mostrar o
+ *    pedido. Agora pegamos a lista e usamos a primeira.
+ *
+ * 2) `ilike` trata `_` e `%` como curingas. Um código com underline casaria
+ *    com qualquer caractere naquela posição — e podia trazer o pedido errado,
+ *    ou vários. Escapamos os dois antes de consultar.
+ */
 export async function findPedido(code: string, marketplace?: string) {
-  let q = db("pedidos").select("*").ilike("tracking_code", code.trim());
+  const limpo = code.trim();
+  if (!limpo) return null;
+
+  const semCuringas = limpo.replace(/([\\%_])/g, "\\$1");
+
+  let q = db("pedidos").select("*").ilike("tracking_code", semCuringas).limit(1);
   if (marketplace) q = q.eq("marketplace", marketplace);
-  const { data, error } = await q.maybeSingle();
+
+  const { data, error } = await q;
   if (error) throw error;
-  return (data as Pedido | null) ?? null;
+
+  const linhas = (data ?? []) as Pedido[];
+  return linhas[0] ?? null;
 }
 
 export async function listPedidos() {

@@ -173,11 +173,7 @@ export function TrackingPanel() {
       }
 
       void registrar({ code: code.trim(), found: false, source: "nao_encontrado" });
-      throw new Error(
-        conectado
-          ? "Código não encontrado nos rastreios cadastrados nem nas suas compras do Mercado Livre."
-          : "Código não encontrado nos rastreios cadastrados. Se for uma compra do Mercado Livre, conecte sua conta para buscá-la.",
-      );
+      throw new Error("Código não encontrado. Confira os números e tente de novo.");
     },
     onSuccess: ({ pedido: p, eventos }) => {
       setEventosReais(eventos);
