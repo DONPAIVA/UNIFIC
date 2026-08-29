@@ -22,6 +22,8 @@ export type Pedido = {
   invoice_number: string | null;
   invoice_series: string | null;
   notes: string | null;
+  /** Porcentagem definida à mão (0-100). Nulo = calcula pelas datas. */
+  progresso_manual?: number | null;
   created_at: string;
   updated_at?: string;
 };
@@ -205,15 +207,35 @@ function rand(seed: number) {
   return x - Math.floor(x);
 }
 
+/**
+ * Só a parte da data (AAAA-MM-DD) de um campo do banco.
+ *
+ * As colunas de data desta tabela vêm em dois formatos: umas como data pura
+ * ("2026-09-09") e outras como instante completo ("2026-09-09T00:00:00+00:00").
+ * O código antigo colava a hora no fim do texto — e, quando o valor já trazia
+ * hora, o resultado virava "2026-09-09T00:00:00+00:00T18:00:00", uma data
+ * INVÁLIDA. A partir dali o progresso dava 0%, o status calculado voltava para
+ * "Aguardando postagem" e a entrega prevista sumia da tela, escondendo o que
+ * havia sido salvo.
+ */
+function soData(valor: string): string {
+  return String(valor).trim().slice(0, 10);
+}
+
 export function shipDateTime(p: Pedido) {
-  const d = new Date(`${p.ship_date}T00:00:00`);
+  const d = new Date(`${soData(p.ship_date)}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return new Date();
   const h = hash(p.tracking_code);
   d.setHours(8 + (h % 6), (h >> 4) % 60, 0, 0);
   return d;
 }
 
 export function expectedDate(p: Pedido) {
-  if (p.delivery_date) return new Date(`${p.delivery_date}T18:00:00`);
+  if (p.delivery_date) {
+    const d = new Date(`${soData(p.delivery_date)}T18:00:00`);
+    // Data ilegível não pode derrubar a tela: cai no prazo padrão.
+    if (!Number.isNaN(d.getTime())) return d;
+  }
   const d = shipDateTime(p);
   d.setDate(d.getDate() + DELIVERY_DAYS);
   d.setHours(18, 0, 0, 0);
@@ -252,8 +274,35 @@ export function isMoving(p: Pedido, now = Date.now()) {
   return h >= WORK_START_HOUR && h < WORK_END_HOUR && pr > 0 && pr < 100 && !isDelivered(p);
 }
 
-/** Progresso em tempo real (0-100) contando apenas as horas de operação */
+/**
+ * Porcentagem definida à mão, quando existe.
+ *
+ * Devolve `null` sempre que o pedido não tem valor manual — e é por isso que
+ * a checagem não pode ser `if (p.progresso_manual)`: zero é um ajuste legítimo
+ * ("ainda não saiu") e aquela forma o trataria como ausente.
+ */
+export function manualProgress(p: Pedido): number | null {
+  // O valor chega como texto vindo do formulário e como número vindo do banco,
+  // por isso a conversão antes de decidir — `Number("")` daria 0, que é um
+  // ajuste válido e faria "sem valor" virar "parado na origem".
+  const v = p.progresso_manual as number | string | null | undefined;
+  if (v === null || v === undefined || String(v).trim() === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return Math.min(100, Math.max(0, n));
+}
+
+/**
+ * Progresso em tempo real (0-100) contando apenas as horas de operação.
+ *
+ * O valor manual, quando existe, manda em tudo: é o ponto do ajuste. Como o
+ * caminhão do mapa, o texto de tempo restante e o rótulo de status saem todos
+ * daqui, mexer na porcentagem move os três juntos.
+ */
 export function progressOf(p: Pedido, now = Date.now()) {
+  const manual = manualProgress(p);
+  if (manual !== null) return manual;
+
   const start = shipDateTime(p).getTime();
   const end = expectedDate(p).getTime();
   if (now <= start) return 0;
@@ -327,6 +376,8 @@ export function statusFor(p: Pedido, now = Date.now()) {
 export function fmtDate(d: Date | string | null) {
   if (!d) return "—";
   const dt = typeof d === "string" ? new Date(d.length <= 10 ? `${d}T12:00:00` : d) : d;
+  // Sem esta guarda, um valor estranho vira "Invalid Date" na tela do cliente.
+  if (Number.isNaN(dt.getTime())) return "—";
   return dt.toLocaleDateString("pt-BR");
 }
 

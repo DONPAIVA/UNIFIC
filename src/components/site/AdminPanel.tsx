@@ -72,6 +72,105 @@ function CepField({
 }
 
 
+/**
+ * Ajuste manual da porcentagem de um rastreio.
+ *
+ * A barra move o caminhão do mapa, o texto de tempo restante e o rótulo de
+ * status ao mesmo tempo, porque os três saem de `progressOf`. A prévia aqui
+ * mostra o resultado antes de salvar — sem ela seria preciso salvar, abrir o
+ * rastreio e voltar para descobrir onde o caminhão parou.
+ *
+ * Vazio devolve o pedido ao cálculo automático pelas datas, como era antes.
+ */
+function ControleDeProgresso({
+  valor,
+  onChange,
+  pedido,
+}: {
+  valor: number | string | null | undefined;
+  onChange: (v: number | null) => void;
+  pedido: Form;
+}) {
+  const manual = valor === "" || valor === null || valor === undefined ? null : Number(valor);
+  const automatico = progressOf(pedido as unknown as Pedido);
+  const efetivo = manual ?? automatico;
+
+  return (
+    <div className="mt-3 rounded-lg border border-primary/40 bg-primary/5 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-bold">
+          Progresso da entrega
+          <span className="ml-2 font-normal text-muted-foreground">
+            {manual === null ? "automático pelas datas" : "definido por você"}
+          </span>
+        </span>
+        <span className="font-display text-lg font-bold">{efetivo.toFixed(1)}%</span>
+      </div>
+
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={0.5}
+        value={efetivo}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="mt-2 w-full accent-primary"
+        aria-label="Porcentagem do progresso"
+      />
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <input
+          type="number"
+          min={0}
+          max={100}
+          step={0.1}
+          value={manual ?? ""}
+          placeholder={automatico.toFixed(1)}
+          onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+          className="w-24 rounded-md border border-input bg-white px-2 py-1 text-sm"
+        />
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className="rounded-md border border-border px-3 py-1 text-xs font-semibold"
+        >
+          Voltar ao automático
+        </button>
+        {[0, 25, 50, 75, 100].map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(v)}
+            className="rounded-md border border-border px-2 py-1 text-xs font-semibold hover:border-primary"
+          >
+            {v}%
+          </button>
+        ))}
+      </div>
+
+      {/* Prévia: a estrada e o caminhão na posição escolhida. */}
+      <div className="relative mt-3 h-9 rounded-md bg-muted">
+        <div
+          className="absolute inset-y-0 left-0 rounded-l-md bg-primary/30"
+          style={{ width: `${efetivo}%` }}
+        />
+        <div
+          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl transition-[left] duration-300"
+          style={{ left: `${efetivo}%` }}
+          aria-hidden
+        >
+          🚚
+        </div>
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] font-semibold text-muted-foreground">
+        <span>{pedido.origin_city || "origem"}</span>
+        <span>{statusFor(pedido as unknown as Pedido)}</span>
+        <span>{pedido.dest_city || "destino"}</span>
+      </div>
+    </div>
+  );
+}
+
 const ADMIN_PASS = "unific2026";
 const STATUSES = ["Aguardando postagem", "Em trânsito", "Saiu para entrega", "Entregue", "Aguardando retirada", "Extraviado"];
 
@@ -95,6 +194,8 @@ const empty = {
   weight: 1,
   invoice_number: "",
   notes: "",
+  // Nulo = o progresso continua sendo calculado pelas datas, como sempre foi.
+  progresso_manual: null as number | null,
 };
 
 type Form = typeof empty & { id?: string };
@@ -191,7 +292,13 @@ function PedidosAdmin() {
       if (!f.tracking_code.trim() || !f.recipient.trim() || !f.dest_city.trim()) {
         throw new Error("Código, destinatário e cidade de destino são obrigatórios.");
       }
-      const payload: Record<string, unknown> = { ...f, delivery_date: f.delivery_date || null };
+      const payload: Record<string, unknown> = {
+        ...f,
+        delivery_date: f.delivery_date || null,
+        // Campo vazio devolve o pedido ao calculo automatico.
+        progresso_manual:
+          f.progresso_manual === null || String(f.progresso_manual) === "" ? null : Number(f.progresso_manual),
+      };
       await savePedido(payload as Partial<Pedido> & { tracking_code: string });
     },
     onSuccess: () => {
@@ -291,6 +398,13 @@ function PedidosAdmin() {
             {field("product_value", "Valor (R$)", "number")}
             {field("weight", "Peso (kg)", "number")}
           </div>
+
+          <ControleDeProgresso
+            valor={form.progresso_manual}
+            onChange={(v) => setForm({ ...form, progresso_manual: v })}
+            pedido={form}
+          />
+
           <div className="mt-3 flex gap-2">
             <button onClick={() => save.mutate(form)} disabled={save.isPending} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">
               <Save className="h-4 w-4" /> Salvar
@@ -344,6 +458,7 @@ function PedidosAdmin() {
                             product: p.product ?? "",
                             invoice_number: p.invoice_number ?? "",
                             notes: p.notes ?? "",
+                            progresso_manual: p.progresso_manual ?? null,
                             delivery_date: p.delivery_date ?? "",
                             product_value: p.product_value ?? 0,
                             weight: p.weight ?? 1,

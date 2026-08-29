@@ -21,20 +21,63 @@ export async function listPedidos() {
   return (data ?? []) as Pedido[];
 }
 
+/**
+ * O banco reclamou de uma coluna que não existe? Devolve o nome dela.
+ *
+ * São DOIS formatos diferentes, e por isso as duas expressões:
+ *  - PGRST204, do cache de esquema do PostgREST:
+ *      Could not find the 'progresso_manual' column of 'pedidos' ...
+ *  - 42703, direto do Postgres:
+ *      column pedidos.progresso_manual does not exist
+ */
+function colunaInexistente(error: any): string | null {
+  const code = String(error?.code ?? "");
+  const msg = String(error?.message ?? "");
+  if (code !== "PGRST204" && code !== "42703" && !/does not exist|could not find/i.test(msg)) {
+    return null;
+  }
+  const cache = msg.match(/could not find the '([a-z0-9_]+)' column/i);
+  if (cache?.[1]) return cache[1];
+  const pg = msg.match(/column\s+\S*?\.?"?([a-z0-9_]+)"?\s+does not exist/i);
+  return pg?.[1] ?? null;
+}
+
 export async function savePedido(p: Partial<Pedido> & { tracking_code: string }) {
+  /*
+   * Salva tolerando coluna que ainda não existe no banco.
+   *
+   * O painel envia campos novos (como `progresso_manual`) que só passam a
+   * existir depois da migração rodar. Sem isto, publicar o código antes de
+   * rodar o SQL travaria TODO salvamento de pedido — inclusive mudar o status,
+   * que nada tem a ver com o campo novo.
+   *
+   * Então, quando o banco acusa coluna desconhecida, ela sai do envio e a
+   * gravação é refeita. O resto do cadastro é salvo normalmente.
+   */
+  const gravar = async (dados: any): Promise<void> => {
+    const resposta = p.id
+      ? await db("pedidos").update(dados).eq("id", p.id)
+      : await db("pedidos").insert(dados);
+
+    const error = resposta.error;
+    if (!error) return;
+
+    const faltando = colunaInexistente(error);
+    if (faltando && faltando in dados) {
+      console.warn(`[pedidos] coluna "${faltando}" ainda não existe no banco; salvando sem ela.`);
+      const { [faltando]: _fora, ...semAColuna } = dados;
+      return gravar(semAColuna);
+    }
+
+    console.error("[pedidos] falha ao salvar:", error.message, error.details ?? "", error.hint ?? "");
+    throw new Error(describeSupabaseError(error));
+  };
+
   if (p.id) {
-    const { id, created_at: _c, updated_at: _u, ...rest } = p as any;
-    const { error } = await db("pedidos").update(rest).eq("id", id);
-    if (error) {
-      console.error("[pedidos] falha ao atualizar:", error.message, error.details ?? "", error.hint ?? "");
-      throw new Error(describeSupabaseError(error));
-    }
+    const { id: _id, created_at: _c, updated_at: _u, ...rest } = p as any;
+    await gravar(rest);
   } else {
-    const { error } = await db("pedidos").insert(p);
-    if (error) {
-      console.error("[pedidos] falha ao inserir:", error.message, error.details ?? "", error.hint ?? "");
-      throw new Error(describeSupabaseError(error));
-    }
+    await gravar({ ...p });
   }
 }
 
