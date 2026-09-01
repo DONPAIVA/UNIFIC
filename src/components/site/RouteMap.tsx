@@ -186,7 +186,11 @@ export default function RouteMap({ from, to, progress, fromLabel, toLabel, movin
           </Tooltip>
         </CircleMarker>
         <Marker position={truck} icon={truckIcon(moving, flip)} zIndexOffset={500}>
-          <Popup>Carga em movimento — {progress.toFixed(1)}% do trajeto</Popup>
+          {/* Só anuncia movimento quando há movimento: com a carga parada, o
+              texto fixo entregaria que algo foi congelado. */}
+          <Popup>
+            {moving ? "Carga em movimento" : "Carga"} — {progress.toFixed(1)}% do trajeto
+          </Popup>
         </Marker>
       </MapContainer>
     </div>

@@ -24,6 +24,8 @@ export type Pedido = {
   notes: string | null;
   /** Porcentagem definida à mão (0-100). Nulo = calcula pelas datas. */
   progresso_manual?: number | null;
+  /** Caminhão congelado no mapa. Nada é mostrado ao cliente sobre a pausa. */
+  pausado?: boolean | null;
   created_at: string;
   updated_at?: string;
 };
@@ -269,6 +271,11 @@ export function activeMsBetween(from: number, to: number) {
 
 /** O caminhão está rodando agora? (falso na madrugada e após a entrega) */
 export function isMoving(p: Pedido, now = Date.now()) {
+  // Pausado congela o caminhão: ele para de balançar no mapa e o painel deixa
+  // de anunciar movimento. Para quem acompanha não aparece aviso nenhum de
+  // pausa — o objeto simplesmente não se mexe, como numa parada qualquer.
+  if (p.pausado) return false;
+
   const h = new Date(now).getHours();
   const pr = progressOf(p, now);
   return h >= WORK_START_HOUR && h < WORK_END_HOUR && pr > 0 && pr < 100 && !isDelivered(p);

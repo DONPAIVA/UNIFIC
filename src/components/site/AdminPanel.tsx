@@ -85,10 +85,14 @@ function CepField({
 function ControleDeProgresso({
   valor,
   onChange,
+  pausado,
+  onPausar,
   pedido,
 }: {
   valor: number | string | null | undefined;
   onChange: (v: number | null) => void;
+  pausado: boolean;
+  onPausar: (v: boolean) => void;
   pedido: Form;
 }) {
   const manual = valor === "" || valor === null || valor === undefined ? null : Number(valor);
@@ -167,6 +171,23 @@ function ControleDeProgresso({
         <span>{statusFor(pedido as unknown as Pedido)}</span>
         <span>{pedido.dest_city || "destino"}</span>
       </div>
+
+      {/* Pausa: congela o caminhão no mapa. O cliente não vê aviso nenhum de
+          pausa — para ele o objeto apenas não se mexe. */}
+      <label className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-xs font-semibold">
+        <input
+          type="checkbox"
+          checked={pausado}
+          onChange={(e) => onPausar(e.target.checked)}
+          className="h-4 w-4 accent-primary"
+        />
+        Pausar o caminhão
+        <span className="font-normal text-muted-foreground">
+          {pausado
+            ? "parado no mapa — o cliente não vê aviso de pausa"
+            : "segue se movendo normalmente"}
+        </span>
+      </label>
     </div>
   );
 }
@@ -196,6 +217,8 @@ const empty = {
   notes: "",
   // Nulo = o progresso continua sendo calculado pelas datas, como sempre foi.
   progresso_manual: null as number | null,
+  // Caminhão congelado no mapa, sem nenhum aviso para o cliente.
+  pausado: false,
 };
 
 type Form = typeof empty & { id?: string };
@@ -402,6 +425,8 @@ function PedidosAdmin() {
           <ControleDeProgresso
             valor={form.progresso_manual}
             onChange={(v) => setForm({ ...form, progresso_manual: v })}
+            pausado={Boolean(form.pausado)}
+            onPausar={(v) => setForm({ ...form, pausado: v })}
             pedido={form}
           />
 
@@ -459,6 +484,7 @@ function PedidosAdmin() {
                             invoice_number: p.invoice_number ?? "",
                             notes: p.notes ?? "",
                             progresso_manual: p.progresso_manual ?? null,
+                            pausado: Boolean(p.pausado),
                             delivery_date: p.delivery_date ?? "",
                             product_value: p.product_value ?? 0,
                             weight: p.weight ?? 1,
