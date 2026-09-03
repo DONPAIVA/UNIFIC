@@ -139,9 +139,18 @@ export function TrackingPanel() {
         args: Parameters<typeof registrarConsultaRastreio>[0]["data"],
       ) => registrarConsultaRastreio({ data: args }).catch(() => undefined);
 
-      // 1) Códigos cadastrados no painel do Únific+ (tabela `pedidos`).
-      //    Só se chega aqui com a conta do Mercado Livre conectada: quem chama
-      //    esta busca é `rastrear`, e ele barra antes quem não está conectado.
+      /*
+       * A busca olha SÓ os rastreios cadastrados no painel (tabela `pedidos`).
+       *
+       * É o rastreio da transportadora, e ele é separado das compras que o
+       * cliente tem no Mercado Livre. Antes, quando o código não estava
+       * cadastrado, a busca ainda ia procurar nas compras dele — misturando
+       * duas coisas que não têm relação e trazendo um pedido que não é deste
+       * rastreio.
+       *
+       * Como consequência, a sincronização do Mercado Livre deixou de
+       * interferir aqui: se ela estiver incompleta, o rastreio segue igual.
+       */
       const local = await findPedido(code, undefined);
       if (local) {
         void registrar({
@@ -152,31 +161,6 @@ export function TrackingPanel() {
           status: local.status,
         });
         return { pedido: local, compraId: null as string | null, eventos: null as Movimento[] | null };
-      }
-
-      // 2) Compras do Mercado Livre — SOMENTE da conta do cliente autenticado.
-      //    Nunca busca em contas de outros clientes.
-      if (autenticado) {
-        const ml = await rastrearMinhaCompraCompleta({ data: { codigo: code.trim() } });
-        if (ml) {
-          void registrar({
-            code: code.trim(),
-            marketplace: "mercado_livre",
-            found: true,
-            source: "mercado_livre",
-            status: ml.pedido.status,
-          });
-          return {
-            pedido: ml.pedido as unknown as Pedido,
-            compraId: ml.compraId,
-            eventos: ml.eventos.map((e: { at: string; title: string; place: string }) => ({
-              at: new Date(e.at),
-              title: e.title,
-              place: e.place,
-              done: true,
-            })) as Movimento[],
-          };
-        }
       }
 
       void registrar({ code: code.trim(), found: false, source: "nao_encontrado" });

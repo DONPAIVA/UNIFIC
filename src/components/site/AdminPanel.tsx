@@ -219,6 +219,8 @@ const empty = {
   progresso_manual: null as number | null,
   // Caminhão congelado no mapa, sem nenhum aviso para o cliente.
   pausado: false,
+  // Vazio = a hora do primeiro evento é calculada pelo código do rastreio.
+  hora_coleta: "",
 };
 
 type Form = typeof empty & { id?: string };
@@ -321,6 +323,8 @@ function PedidosAdmin() {
         // Campo vazio devolve o pedido ao calculo automatico.
         progresso_manual:
           f.progresso_manual === null || String(f.progresso_manual) === "" ? null : Number(f.progresso_manual),
+        // Nulo, e nao string vazia: o banco so aceita HH:MM ou nada.
+        hora_coleta: f.hora_coleta ? String(f.hora_coleta).slice(0, 5) : null,
       };
       await savePedido(payload as Partial<Pedido> & { tracking_code: string });
     },
@@ -415,6 +419,7 @@ function PedidosAdmin() {
             {field("origin_city", "Cidade de origem")}
             {field("origin_state", "UF origem")}
             {field("ship_date", "Data de envio", "date")}
+            {field("hora_coleta", "Hora da coleta (vazio = automático)", "time")}
             {field("delivery_date", "Entrega prevista (vazio = +15 dias)", "date")}
             {field("invoice_number", "Nº da nota fiscal")}
             {field("product", "Produto")}
@@ -485,6 +490,7 @@ function PedidosAdmin() {
                             notes: p.notes ?? "",
                             progresso_manual: p.progresso_manual ?? null,
                             pausado: Boolean(p.pausado),
+                            hora_coleta: p.hora_coleta ?? "",
                             delivery_date: p.delivery_date ?? "",
                             product_value: p.product_value ?? 0,
                             weight: p.weight ?? 1,

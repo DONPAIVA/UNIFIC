@@ -26,6 +26,8 @@ export type Pedido = {
   progresso_manual?: number | null;
   /** Caminhão congelado no mapa. Nada é mostrado ao cliente sobre a pausa. */
   pausado?: boolean | null;
+  /** Hora da coleta (HH:MM). Nulo = calcula sozinho pelo código. */
+  hora_coleta?: string | null;
   created_at: string;
   updated_at?: string;
 };
@@ -227,8 +229,25 @@ function soData(valor: string): string {
 export function shipDateTime(p: Pedido) {
   const d = new Date(`${soData(p.ship_date)}T00:00:00`);
   if (Number.isNaN(d.getTime())) return new Date();
+
+  // Hora escolhida à mão para este pedido, quando existe.
+  const escolhida = String(p.hora_coleta ?? "").match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (escolhida) {
+    d.setHours(Number(escolhida[1]), Number(escolhida[2]), 0, 0);
+    return d;
+  }
+
+  /*
+   * Sem hora definida, ela é derivada do código — sempre a mesma para o mesmo
+   * rastreio, entre 8h e 13h.
+   *
+   * O `% 60` dos minutos vinha SEM valor absoluto, e `>>` trabalha em 32 bits:
+   * hash grande estoura para negativo e o resto também sai negativo. O efeito
+   * era a hora andar para TRÁS — o pedido 37543BR virava 07:51, fora da faixa
+   * de 8h a 13h que este cálculo promete.
+   */
   const h = hash(p.tracking_code);
-  d.setHours(8 + (h % 6), (h >> 4) % 60, 0, 0);
+  d.setHours(8 + (h % 6), Math.abs(h >> 4) % 60, 0, 0);
   return d;
 }
 
