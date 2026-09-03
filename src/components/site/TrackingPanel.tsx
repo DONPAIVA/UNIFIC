@@ -53,17 +53,17 @@ export function TrackingPanel() {
   const hydrated = useHydrated();
 
   /*
-   * O RASTREIO É ABERTO A QUALQUER PESSOA.
+   * O PONTO FINAL É A AUTORIZAÇÃO DO APP NO MERCADO LIVRE.
    *
-   * Não exige login nem conta do Mercado Livre conectada. Estar logado só
-   * amplia o alcance da busca, incluindo as compras da conta conectada.
+   * Ter conta criada não basta: sem a conexão feita, o rastreio não abre. Quem
+   * clicar em rastrear sem ela vai direto para a tela de autorização — o mesmo
+   * destino do botão "Conectar Mercado Livre".
    *
-   * Já foi diferente: em algum momento a busca exigiu conexão ativa e
-   * sincronizada, o que trancava do lado de fora quem só tinha um código
-   * cadastrado no painel — que nem passa pelo Mercado Livre.
+   * A trava é a conexão EXISTIR, não a sincronização ter terminado. Se fosse
+   * a sincronização, uma carga inicial interrompida (o servidor reinicia e ela
+   * roda solta, sem ninguém esperando) trancaria aquele cliente para sempre,
+   * em círculo: rastreia, vai autorizar, volta e continua travado.
    */
-
-  // Consultada só para AVISAR o que ainda dá para ganhar conectando.
   const conexao = useQuery({
     queryKey: ["minha-conexao"],
     queryFn: () => minhaConexao(),
@@ -72,21 +72,26 @@ export function TrackingPanel() {
   });
 
   const conectado = Boolean(conexao.data?.conectado);
+  const liberado = conectado;
+  // Enquanto a consulta não responde não se sabe se há conexão — e mandar para
+  // o Mercado Livre nessa dúvida tiraria da tela quem já estava conectado.
+  const verificandoConexao = autenticado && conexao.isLoading;
 
   useEffect(() => {
     document.documentElement.setAttribute("data-mp", mp);
   }, [mp]);
 
   /*
-   * Retoma o rastreio depois de entrar pelo Mercado Livre.
+   * Retoma o rastreio depois de autorizar no Mercado Livre.
    *
-   * Quem clicou em "RASTREAR AGORA" sem estar logado foi para o Mercado Livre
-   * com o que digitou guardado. Ao voltar já com acesso, o campo volta
-   * preenchido e a busca dispara sozinha — sem digitar de novo.
+   * Quem clicou em "RASTREAR AGORA" sem a conexão foi para o Mercado Livre com
+   * o que digitou guardado. Ao voltar conectado, o campo volta preenchido e a
+   * busca dispara sozinha — sem digitar de novo.
    */
   useEffect(() => {
-    // Só depois de entrar: é a volta do Mercado Livre que esta retomada serve.
-    if (!autenticado) return;
+    // Espera a conexão aparecer: retomar antes cairia na mesma trava e
+    // devolveria a pessoa ao Mercado Livre, em círculo.
+    if (!liberado) return;
     let pendente: string | null = null;
     try {
       pendente = sessionStorage.getItem("unific:rastreio-pendente");
@@ -107,8 +112,10 @@ export function TrackingPanel() {
         search.mutate(pendente);
       }
     }
+    // Dispara na virada para conectado, não no login: a conexão é consultada
+    // por rede e fica pronta depois dele.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autenticado]);
+  }, [liberado]);
 
   // O relógio só roda quando há um pedido na tela, e a cada 20s em vez de 1s:
   // os textos de ETA/progresso mudam por minuto, então 1s só causava re-render
@@ -222,6 +229,41 @@ export function TrackingPanel() {
     setView("map");
   };
 
+  const [indoParaMl, setIndoParaMl] = useState(false);
+
+  /**
+   * Leva a pessoa à autorização do app no Mercado Livre.
+   *
+   * Guarda o que ela digitou (código ou CPF) para a busca ser refeita sozinha
+   * na volta, sem precisar digitar de novo.
+   *
+   * Dois fluxos, escolhidos pelo estado dela:
+   *  - já entrou  → `startMlConnect`, que amarra a conexão ao cadastro dela;
+   *  - sem conta  → `startMlConnectPublico`, que cria o acesso a partir da
+   *                 própria conta que autorizar, sem formulário no caminho.
+   */
+  const irParaAutorizacaoMl = async (pendente: string) => {
+    setIndoParaMl(true);
+    try {
+      sessionStorage.setItem("unific:rastreio-pendente", pendente);
+    } catch {
+      /* aba anônima: segue sem a retomada automática. */
+    }
+
+    try {
+      const ml = await import("@/lib/ml.functions");
+      const { authorizationUrl } = autenticado
+        ? await ml.startMlConnect()
+        : await ml.startMlConnectPublico();
+      window.location.href = authorizationUrl;
+    } catch (e) {
+      setIndoParaMl(false);
+      toast.error(
+        e instanceof Error ? e.message : "Não foi possível abrir a autorização do Mercado Livre.",
+      );
+    }
+  };
+
   const rastrear = async () => {
     const digitado = code.trim();
 
@@ -242,15 +284,20 @@ export function TrackingPanel() {
     const ehCpf = soDigitos.length === 11;
 
     /*
-     * O rastreio é ABERTO: não exige login nem conta do Mercado Livre.
-     *
-     * Quem está logado ganha um alcance maior — a busca também olha as compras
-     * da conta do Mercado Livre conectada. Quem não está encontra os rastreios
-     * cadastrados no painel, que é o que existe para ser mostrado sem conta.
-     *
-     * A autorização do Mercado Livre continua disponível pelo botão de
-     * conectar; ela só deixou de ser barreira na frente do campo de busca.
+     * Sem a conexão do Mercado Livre, nada é rastreado — por código ou por
+     * CPF, sem distinção. Vale tanto para quem não tem conta quanto para quem
+     * criou conta e nunca autorizou o app: os dois vão para a autorização.
      */
+    if (verificandoConexao) {
+      toast.info("Verificando sua conexão com o Mercado Livre...");
+      return;
+    }
+
+    if (!liberado) {
+      await irParaAutorizacaoMl(ehCpf ? soDigitos : digitado);
+      return;
+    }
+
     if (ehCpf) {
       buscaPorCpf.mutate(soDigitos);
       return;
@@ -415,34 +462,24 @@ export function TrackingPanel() {
         </p>
       </div>
 
-      {/* Explica o que vai acontecer ao clicar em rastrear sem estar logado:
-          o visitante é levado ao Mercado Livre para autorizar. Sem cadastro,
-          sem formulário — quem prefere entrar por e-mail e senha ainda tem o
-          link ao lado. */}
-      {/* Rastrear não exige conta. O convite para entrar continua, porque é o
-          que dá acesso às compras do Mercado Livre — mas como oferta, não como
-          exigência. */}
-      {!autenticado && (
+      {/* Um aviso só, para os dois casos que ainda não podem rastrear: quem não
+          tem conta e quem tem conta mas nunca autorizou o app. Os dois vão para
+          a mesma tela ao clicar em rastrear, então a mensagem é a mesma. */}
+      {!liberado && !verificandoConexao && (
         <div className="mx-auto mt-5 max-w-2xl rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-center">
           <p className="text-xs text-muted-foreground">
-            Rastreando uma compra sua do Mercado Livre?{" "}
-            <Link
-              to="/entrar"
-              className="inline-flex items-center gap-1 font-bold text-primary underline"
-            >
-              <LogIn className="h-3 w-3" /> Entre na sua conta
-            </Link>
-          </p>
-        </div>
-      )}
-
-      {/* Logado sem o Mercado Livre conectado: rastreia normalmente, mas as
-          compras do Mercado Livre só aparecem depois de conectar. É aviso,
-          não impedimento. */}
-      {autenticado && !conectado && !conexao.isLoading && (
-        <div className="mx-auto mt-5 max-w-2xl rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-center">
-          <p className="text-xs text-muted-foreground">
-            Para ver também as suas compras do Mercado Livre, conecte sua conta.
+            Ao rastrear, você autoriza o Únific+ na sua conta do Mercado Livre.
+            {!autenticado && (
+              <>
+                {" "}
+                <Link
+                  to="/entrar"
+                  className="inline-flex items-center gap-1 font-bold text-primary underline"
+                >
+                  <LogIn className="h-3 w-3" /> Já tenho conta
+                </Link>
+              </>
+            )}
           </p>
         </div>
       )}
@@ -491,11 +528,15 @@ export function TrackingPanel() {
 
         <button
           onClick={() => void rastrear()}
-          disabled={search.isPending || buscaPorCpf.isPending}
+          disabled={search.isPending || buscaPorCpf.isPending || indoParaMl}
           className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary py-3 font-display text-base font-bold tracking-wide text-primary-foreground transition-transform hover:scale-[1.01] disabled:opacity-60"
         >
           <PackageSearch className="h-5 w-5" />
-          {search.isPending || buscaPorCpf.isPending ? "BUSCANDO..." : "RASTREAR AGORA"}
+          {indoParaMl
+            ? "ABRINDO O MERCADO LIVRE..."
+            : search.isPending || buscaPorCpf.isPending
+              ? "BUSCANDO..."
+              : "RASTREAR AGORA"}
         </button>
 
         {/* Vários pedidos no mesmo CPF: o cliente escolhe qual acompanhar. */}
