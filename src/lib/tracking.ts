@@ -1,5 +1,7 @@
 export const DELIVERY_DAYS = 15;
 
+import { cidadesNoCaminho } from "./cidades";
+
 export type Pedido = {
   id: string;
   tracking_code: string;
@@ -361,7 +363,36 @@ export function isDelivered(p: Pedido) {
 
 export type Movimento = { at: Date; title: string; place: string; done: boolean };
 
-const HUBS = ["Campinas / SP", "Ribeirão Preto / SP", "Uberlândia / MG", "Montes Claros / MG", "Barreiras / BA", "Vitória da Conquista / BA"];
+/**
+ * Paradas do trajeto entre a origem e o destino DESTE pedido.
+ *
+ * Antes era uma lista fixa no código — sempre Campinas, Ribeirão Preto,
+ * Uberlândia e Montes Claros, para qualquer destino. Uma carga de São Paulo
+ * para o Mato Grosso aparecia passando por Uberlândia, que fica em outra
+ * direção, e o histórico não batia com a linha desenhada no mapa.
+ *
+ * Quando a rota é curta demais, ou não há cidade conhecida no meio do caminho,
+ * a lista volta vazia e o histórico fica só com origem e destino — melhor do
+ * que inventar uma parada em lugar nenhum.
+ */
+function paradasDoTrajeto(p: Pedido, quantas: number): string[] {
+  const semAcento = (s: string) =>
+    (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toUpperCase();
+
+  // A coordenada é resolvida aqui, e não por `geo.ts`, porque aquele arquivo
+  // importa este — usá-lo criaria um ciclo entre os dois.
+  const ponto = (cidade: string, uf: string): [number, number] => {
+    const chave = `${semAcento(cidade)}-${semAcento(uf)}`;
+    return CITY_COORDS[chave] ?? STATE_COORDS[semAcento(uf)] ?? STATE_COORDS["SP"]!;
+  };
+
+  return cidadesNoCaminho(
+    CITY_COORDS,
+    ponto(p.origin_city, p.origin_state),
+    ponto(p.dest_city, p.dest_state),
+    quantas,
+  );
+}
 
 /**
  * A lista COMPLETA de eventos do histórico, já com os ajustes manuais.
@@ -379,7 +410,8 @@ export function eventosDoPedido(p: Pedido): { at: Date; title: string; place: st
   const end = expectedDate(p).getTime();
   const total = end - start;
   const seed = hash(p.tracking_code);
-  const hubs = HUBS.slice(0, 4).map((h, i) => ({ h, i }));
+  // Paradas sobre a rota deste pedido, em ordem de trajeto.
+  const hubs = paradasDoTrajeto(p, 4).map((h, i) => ({ h, i }));
 
   const raw: { at: number; title: string; place: string }[] = [
     { at: start, title: "Objeto postado / coletado", place: `${p.origin_city} / ${p.origin_state}` },
