@@ -22,16 +22,31 @@ export async function findPedido(code: string, marketplace?: string) {
   const limpo = code.trim();
   if (!limpo) return null;
 
-  const semCuringas = limpo.replace(/([\\%_])/g, "\\$1");
+  const buscar = async (termo: string) => {
+    // `_` e `%` são curingas no ilike: escapados, para um código com underline
+    // não casar com qualquer caractere naquela posição.
+    let q = db("pedidos").select("*").ilike("tracking_code", termo.replace(/([\\%_])/g, "\\$1")).limit(1);
+    if (marketplace) q = q.eq("marketplace", marketplace);
+    const { data, error } = await q;
+    if (error) throw error;
+    return ((data ?? []) as Pedido[])[0] ?? null;
+  };
 
-  let q = db("pedidos").select("*").ilike("tracking_code", semCuringas).limit(1);
-  if (marketplace) q = q.eq("marketplace", marketplace);
+  const exato = await buscar(limpo);
+  if (exato) return exato;
 
-  const { data, error } = await q;
-  if (error) throw error;
+  /*
+   * Segunda tentativa sem pontuação.
+   *
+   * O campo de busca já pontuou código enquanto se digitava: "37543BR" virava
+   * "375.43BR" e o pedido "não existia". A máscara foi removida, mas há gente
+   * com esse texto salvo, colado ou no histórico do navegador — e um ponto a
+   * mais não deveria custar um pedido não encontrado.
+   */
+  const semPontuacao = limpo.replace(/[.\s]/g, "");
+  if (semPontuacao && semPontuacao !== limpo) return buscar(semPontuacao);
 
-  const linhas = (data ?? []) as Pedido[];
-  return linhas[0] ?? null;
+  return null;
 }
 
 export async function listPedidos() {
