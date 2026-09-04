@@ -140,12 +140,23 @@ export async function garantirClientePorContaMl(conta: {
 }
 
 /**
- * Link de uso único que estabelece a sessão no navegador.
+ * Endereço de uso único que estabelece a sessão no navegador.
  *
- * Gerado com service_role e consumido imediatamente pelo redirect — não é
- * enviado por e-mail nem exposto ao visitante. Devolve `null` quando o
- * Supabase não consegue gerar, para o chamador seguir por outro caminho em vez
- * de estourar em cima do cliente.
+ * Devolve uma URL DO PRÓPRIO SITE, carregando um código de uso único. A página
+ * de entrada troca esse código por sessão e segue para o rastreio.
+ *
+ * NÃO usamos o `action_link` que o Supabase monta. Aquele link passa pelo
+ * domínio dele, que só aceita retornar para endereços cadastrados na lista de
+ * "Redirect URLs" do projeto — e quando o endereço não está lá, ele não avisa:
+ * manda o cliente para a Site URL, que vem de fábrica como
+ * "http://localhost:3000". Foi isso que aconteceu com quem autorizou pelo
+ * Mercado Livre: terminava a autorização e caía num endereço morto.
+ *
+ * Usando o código direto, a volta acontece no nosso domínio e deixa de
+ * depender de configuração no painel do Supabase.
+ *
+ * Devolve `null` quando não é possível gerar, para o chamador seguir por outro
+ * caminho em vez de estourar em cima do cliente.
  */
 export async function linkDeEntrada(email: string, origem: string): Promise<string | null> {
   const { admin } = await import("./db.server");
@@ -158,8 +169,13 @@ export async function linkDeEntrada(email: string, origem: string): Promise<stri
     });
     if (error) return null;
 
-    const link = data?.properties?.action_link;
-    return typeof link === "string" && link ? link : null;
+    const codigo = data?.properties?.hashed_token;
+    if (typeof codigo === "string" && codigo) {
+      return `${origem}/entrar?acesso=${encodeURIComponent(codigo)}`;
+    }
+
+    // Sem o código não há como concluir aqui; o chamador manda para a entrada.
+    return null;
   } catch {
     return null;
   }

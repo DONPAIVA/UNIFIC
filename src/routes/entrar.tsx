@@ -25,11 +25,13 @@ export const Route = createFileRoute("/entrar")({
   // links para "/entrar" continuem válidos sem precisar informar search.
   validateSearch: (
     search: Record<string, unknown>,
-  ): { next?: "conectar"; codigo?: string; msg?: string } => {
-    const saida: { next?: "conectar"; codigo?: string; msg?: string } = {};
+  ): { next?: "conectar"; codigo?: string; msg?: string; acesso?: string } => {
+    const saida: { next?: "conectar"; codigo?: string; msg?: string; acesso?: string } = {};
     if (search["next"] === "conectar") saida.next = "conectar";
     if (typeof search["codigo"] === "string") saida.codigo = (search["codigo"] as string).slice(0, 40);
     if (typeof search["msg"] === "string") saida.msg = (search["msg"] as string).slice(0, 300);
+    // Código de uso único gerado no retorno do Mercado Livre.
+    if (typeof search["acesso"] === "string") saida.acesso = (search["acesso"] as string).slice(0, 512);
     return saida;
   },
   component: Entrar,
@@ -49,7 +51,7 @@ export const CHAVE_RASTREIO_PENDENTE = "unific:rastreio-pendente";
  */
 function Entrar() {
   const router = useRouter();
-  const { next, codigo, msg } = Route.useSearch();
+  const { next, codigo, msg, acesso } = Route.useSearch();
   const { autenticado, email: emailSessao, carregando, sair } = useSessao();
 
   // Quem chega pelo botão de rastrear sem conta já cai no cadastro.
@@ -70,6 +72,47 @@ function Entrar() {
   useEffect(() => {
     if (msg) setAviso(msg);
   }, [msg]);
+
+  /*
+   * Volta do Mercado Livre: troca o código de uso único por sessão.
+   *
+   * Este é o passo que fecha o "entrar com o Mercado Livre". A troca acontece
+   * AQUI, no nosso domínio, e não no link que o Supabase monta — aquele só
+   * retorna para endereços cadastrados no painel dele e, quando o endereço não
+   * está na lista, despeja o cliente em "http://localhost:3000" sem avisar.
+   */
+  useEffect(() => {
+    if (!acesso) return;
+
+    let vivo = true;
+    setOcupado(true);
+
+    void supabase.auth
+      .verifyOtp({ token_hash: acesso, type: "magiclink" })
+      .then(({ error }) => {
+        if (!vivo) return;
+        setOcupado(false);
+        if (error) {
+          // Código vencido ou já usado: a conexão do Mercado Livre foi salva
+          // de qualquer forma, então basta entrar normalmente.
+          setAviso(
+            "Sua conta do Mercado Livre foi conectada. Entre com seu e-mail para ver seus pedidos.",
+          );
+          return;
+        }
+        void router.navigate({ to: "/" });
+      })
+      .catch(() => {
+        if (!vivo) return;
+        setOcupado(false);
+        setAviso("Não foi possível concluir a entrada. Tente novamente.");
+      });
+
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acesso]);
 
   // Guarda o código de rastreio para retomar a busca depois de conectar.
   useEffect(() => {
