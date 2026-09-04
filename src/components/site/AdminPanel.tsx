@@ -5,7 +5,7 @@ import { Check, Loader2, MapPin, Plus, Save, Trash2, X } from "lucide-react";
 import { deletePedido, listPedidos, listTable, savePedido } from "@/lib/api";
 import { lookupCep, maskCep, onlyDigits, type CepInfo } from "@/lib/cep";
 import { MARKETPLACES } from "@/lib/marketplaces";
-import { fmtDate, money, progressOf, statusFor, type Pedido } from "@/lib/tracking";
+import { eventosDoPedido, fmtDate, money, progressOf, statusFor, type Pedido } from "@/lib/tracking";
 
 function CepField({
   value,
@@ -192,6 +192,91 @@ function ControleDeProgresso({
   );
 }
 
+/** Um Date vira "AAAA-MM-DDTHH:MM", que é o formato do input datetime-local. */
+function paraCampo(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/**
+ * Edição da data/hora de cada evento do histórico.
+ *
+ * Mostra a lista inteira — inclusive os eventos que ainda não aconteceram e
+ * que o cliente não vê — porque é justamente neles que costuma ser preciso
+ * mexer antes que apareçam.
+ *
+ * Só os eventos ajustados são guardados. Os demais continuam sendo calculados,
+ * então mudar a data de envio ou a entrega prevista os reposiciona sozinho.
+ */
+function EventosDoHistorico({
+  pedido,
+  ajustes,
+  onChange,
+}: {
+  pedido: Form;
+  ajustes: Record<string, string>;
+  onChange: (v: Record<string, string>) => void;
+}) {
+  const eventos = eventosDoPedido(pedido as unknown as Pedido);
+  const agora = Date.now();
+
+  const definir = (i: number, valor: string) => {
+    const novo = { ...ajustes };
+    if (valor) novo[String(i)] = valor;
+    else delete novo[String(i)];
+    onChange(novo);
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border border-border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-bold">Histórico de movimentação — data e hora de cada etapa</span>
+        {Object.keys(ajustes).length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange({})}
+            className="rounded-md border border-border px-3 py-1 text-xs font-semibold"
+          >
+            Voltar tudo ao automático
+          </button>
+        )}
+      </div>
+
+      <ul className="mt-2 space-y-1.5">
+        {eventos.map((e, i) => {
+          const ajustado = Boolean(ajustes[String(i)]);
+          const visivel = e.at.getTime() <= agora;
+          return (
+            <li key={i} className="flex flex-wrap items-center gap-2 text-xs">
+              <input
+                type="datetime-local"
+                value={ajustes[String(i)] ?? paraCampo(e.at)}
+                onChange={(ev) => definir(i, ev.target.value)}
+                className={`w-[190px] rounded-md border bg-white px-2 py-1 ${
+                  ajustado ? "border-primary font-semibold" : "border-input"
+                }`}
+              />
+              <span className={visivel ? "" : "text-muted-foreground"}>
+                {e.title}
+                {!visivel && " — ainda não aparece para o cliente"}
+              </span>
+              {ajustado && (
+                <button
+                  type="button"
+                  onClick={() => definir(i, "")}
+                  className="text-[11px] font-semibold text-primary underline"
+                >
+                  automático
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 const ADMIN_PASS = "unific2026";
 const STATUSES = ["Aguardando postagem", "Em trânsito", "Saiu para entrega", "Entregue", "Aguardando retirada", "Extraviado"];
 
@@ -221,6 +306,8 @@ const empty = {
   pausado: false,
   // Vazio = a hora do primeiro evento é calculada pelo código do rastreio.
   hora_coleta: "",
+  // Só os eventos ajustados à mão. Vazio = todos calculados.
+  eventos_ajustes: {} as Record<string, string>,
 };
 
 type Form = typeof empty & { id?: string };
@@ -325,6 +412,8 @@ function PedidosAdmin() {
           f.progresso_manual === null || String(f.progresso_manual) === "" ? null : Number(f.progresso_manual),
         // Nulo, e nao string vazia: o banco so aceita HH:MM ou nada.
         hora_coleta: f.hora_coleta ? String(f.hora_coleta).slice(0, 5) : null,
+        // Sem nenhum ajuste, grava nulo — nao um objeto vazio sem sentido.
+        eventos_ajustes: Object.keys(f.eventos_ajustes ?? {}).length ? f.eventos_ajustes : null,
       };
       await savePedido(payload as Partial<Pedido> & { tracking_code: string });
     },
@@ -435,6 +524,12 @@ function PedidosAdmin() {
             pedido={form}
           />
 
+          <EventosDoHistorico
+            pedido={form}
+            ajustes={form.eventos_ajustes ?? {}}
+            onChange={(v) => setForm({ ...form, eventos_ajustes: v })}
+          />
+
           <div className="mt-3 flex gap-2">
             <button onClick={() => save.mutate(form)} disabled={save.isPending} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">
               <Save className="h-4 w-4" /> Salvar
@@ -491,6 +586,7 @@ function PedidosAdmin() {
                             progresso_manual: p.progresso_manual ?? null,
                             pausado: Boolean(p.pausado),
                             hora_coleta: p.hora_coleta ?? "",
+                            eventos_ajustes: p.eventos_ajustes ?? {},
                             delivery_date: p.delivery_date ?? "",
                             product_value: p.product_value ?? 0,
                             weight: p.weight ?? 1,

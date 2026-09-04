@@ -477,14 +477,13 @@ export function TrackingPanel() {
             id="code"
             value={code}
             maxLength={40}
-            /* Só formata quando o que foi digitado é claramente um CPF: um
-               código de rastreio pode ter números, e pontuar ele atrapalharia. */
-            onChange={(e) => {
-              const bruto = e.target.value;
-              const so = digitos(bruto);
-              const pareceCpf = so.length >= 4 && so.length <= 11 && /^[\d.\-\s]*$/.test(bruto);
-              setCode(pareceCpf ? formatarCpf(so) : bruto);
-            }}
+            /* O campo NÃO pontua nada sozinho.
+               A máscara antiga tratava qualquer sequência de 4 a 11 números
+               como CPF, então um código de rastreio numérico — o 3219483214,
+               por exemplo — virava "321.948.321-4" enquanto se digitava, e o
+               ponto atrapalhava. Quem digita CPF pode pôr os pontos ou não: a
+               busca desconta a pontuação de qualquer jeito. */
+            onChange={(e) => setCode(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void rastrear()}
             placeholder="Ex: 954321 ou 123.456.789-09"
             className="mt-2 w-full rounded-md border border-input bg-white px-3 py-2.5 text-sm text-card-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"

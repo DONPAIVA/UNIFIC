@@ -28,6 +28,8 @@ export type Pedido = {
   pausado?: boolean | null;
   /** Hora da coleta (HH:MM). Nulo = calcula sozinho pelo código. */
   hora_coleta?: string | null;
+  /** Data/hora ajustada à mão por evento: {"0": "2026-09-03T17:50"}. */
+  eventos_ajustes?: Record<string, string> | null;
   created_at: string;
   updated_at?: string;
 };
@@ -361,8 +363,18 @@ export type Movimento = { at: Date; title: string; place: string; done: boolean 
 
 const HUBS = ["Campinas / SP", "Ribeirão Preto / SP", "Uberlândia / MG", "Montes Claros / MG", "Barreiras / BA", "Vitória da Conquista / BA"];
 
-/** Histórico de movimentação dinâmico: só mostra eventos cuja data/hora já passou */
-export function buildMovimentos(p: Pedido, now = Date.now()): Movimento[] {
+/**
+ * A lista COMPLETA de eventos do histórico, já com os ajustes manuais.
+ *
+ * Existe separada de `buildMovimentos` porque o painel precisa ver todos os
+ * eventos para poder editar suas datas — inclusive os que ainda não
+ * aconteceram e que o cliente, portanto, não vê.
+ *
+ * A posição de cada evento nesta lista é a CHAVE do ajuste. Por isso a ordem
+ * aqui é fixa e não pode ser embaralhada: mudar a ordem faria os ajustes já
+ * salvos apontarem para o evento errado.
+ */
+export function eventosDoPedido(p: Pedido): { at: Date; title: string; place: string }[] {
   const start = shipDateTime(p).getTime();
   const end = expectedDate(p).getTime();
   const total = end - start;
@@ -384,11 +396,31 @@ export function buildMovimentos(p: Pedido, now = Date.now()): Movimento[] {
     { at: end, title: "Objeto entregue ao destinatário", place: `${p.dest_city} / ${p.dest_state}` },
   ];
 
-  const list = raw
-    .map((r) => ({ at: new Date(r.at), title: r.title, place: r.place, done: r.at <= now }))
+  const ajustes = p.eventos_ajustes ?? null;
+
+  return raw.map((r, i) => {
+    const escolhido = ajustes ? ajustes[String(i)] : null;
+    const data = escolhido ? new Date(escolhido) : null;
+    // Ajuste ilegível é ignorado em vez de virar "Invalid Date" na tela.
+    const at = data && !Number.isNaN(data.getTime()) ? data : new Date(r.at);
+    return { at, title: r.title, place: r.place };
+  });
+}
+
+/** Histórico de movimentação dinâmico: só mostra eventos cuja data/hora já passou */
+export function buildMovimentos(p: Pedido, now = Date.now()): Movimento[] {
+  const list = eventosDoPedido(p)
+    .map((r) => ({ ...r, done: r.at.getTime() <= now }))
     .filter((r) => r.done || isDelivered(p));
 
-  return list.reverse();
+  /*
+   * Ordena pela data em vez de confiar na ordem de montagem.
+   *
+   * Sem ajustes as duas coincidem, então nada muda. Com ajustes, um evento
+   * movido para antes de outro apareceria fora de lugar na linha do tempo —
+   * o cliente veria a entrega listada acima da coleta, por exemplo.
+   */
+  return list.sort((a, b) => b.at.getTime() - a.at.getTime());
 }
 
 export function statusFor(p: Pedido, now = Date.now()) {
