@@ -50,6 +50,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { ERRO_2FA } from "@/lib/auth-middleware";
+import { aberturaDoPainel, definirNomeDaSaudacao, definirVoz, nomeDaSaudacao, vozLigada } from "@/lib/sfx";
 import { adminBloquearCliente, adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
 import { adminAoVivo, adminBloquearIp, adminIpsBloqueados, registrarTentativaPainel } from "@/lib/monitor.functions";
 import mlLogo from "@/assets/ml-logo.png";
@@ -777,6 +778,24 @@ function CentralML() {
   useEffect(() => {
     void check();
   }, [check]);
+
+  /*
+   * Abertura falada, uma vez por entrada.
+   *
+   * O navegador só deixa tocar som depois de a pessoa interagir com a página —
+   * e aqui isso já aconteceu, porque ela clicou para entrar. A marca na sessão
+   * evita repetir a saudação a cada troca de aba ou recarregamento.
+   */
+  useEffect(() => {
+    if (!session) return;
+    try {
+      if (sessionStorage.getItem("unific:ja-saudou") === "1") return;
+      sessionStorage.setItem("unific:ja-saudou", "1");
+    } catch {
+      /* aba anônima: fala toda vez, e tudo bem */
+    }
+    aberturaDoPainel();
+  }, [session]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -4000,6 +4019,88 @@ function ConsoleTab({ accountId }: { accountId: string | null }) {
 /* ========================================================================== */
 
 /**
+ * Abertura falada do painel.
+ *
+ * A voz vem do próprio navegador (`speechSynthesis`) — sem arquivo de áudio,
+ * sem biblioteca e sem chamada externa. Nem todo aparelho traz voz em
+ * português; quando não traz, o aviso aqui explica em vez de deixar o botão
+ * mudo sem motivo aparente.
+ */
+function VozDoPainel() {
+  const [ligada, setLigada] = useState(true);
+  const [nome, setNome] = useState("");
+  const [temVozPt, setTemVozPt] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setLigada(vozLigada());
+    setNome(nomeDaSaudacao());
+
+    const conferir = () => {
+      const vozes = window.speechSynthesis?.getVoices?.() ?? [];
+      if (vozes.length) setTemVozPt(vozes.some((v) => /^pt/i.test(v.lang)));
+    };
+    conferir();
+    // A lista de vozes chega depois no Chrome; sem isto, o aviso ficaria errado.
+    window.speechSynthesis?.addEventListener?.("voiceschanged", conferir);
+    return () => window.speechSynthesis?.removeEventListener?.("voiceschanged", conferir);
+  }, []);
+
+  return (
+    <Panel title="Voz de abertura">
+      <label className="flex items-center gap-2 text-sm font-semibold">
+        <input
+          type="checkbox"
+          checked={ligada}
+          onChange={(e) => {
+            setLigada(e.target.checked);
+            definirVoz(e.target.checked);
+          }}
+          className="h-4 w-4 accent-[#3483FA]"
+        />
+        Falar ao entrar no painel
+      </label>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-bold text-zinc-700">Me chame de</span>
+        <input
+          value={nome}
+          onChange={(e) => {
+            setNome(e.target.value);
+            definirNomeDaSaudacao(e.target.value);
+          }}
+          maxLength={40}
+          placeholder="Don"
+          className="w-40 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm"
+        />
+        <button
+          onClick={() => aberturaDoPainel(nome || undefined)}
+          disabled={!ligada}
+          className="rounded-lg bg-[#3483FA] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+        >
+          Ouvir agora
+        </button>
+      </div>
+
+      <p className="mt-2 text-xs text-zinc-700">
+        Vai dizer: <b>“Olá {nome || "Don"}. Bem-vindo à central Olho de Deus.”</b>
+      </p>
+
+      {temVozPt === false && (
+        <p className="mt-2 text-xs font-bold text-amber-700">
+          Este aparelho não tem voz em português instalada. A frase pode sair com sotaque ou não
+          sair — depende do navegador.
+        </p>
+      )}
+
+      <p className="mt-2 text-[11px] text-zinc-600">
+        A saudação toca uma vez por entrada, não a cada troca de aba. A escolha vale neste
+        navegador.
+      </p>
+    </Panel>
+  );
+}
+
+/**
  * Ativar e desativar a verificação em duas etapas.
  *
  * A ativação tem duas partes de propósito: primeiro o segredo é gerado e
@@ -4246,6 +4347,8 @@ function ConfiguracoesTab({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <>
+      <VozDoPainel />
+
       <SegundoFatorPainel />
 
       <DiagnosticoOAuth />
