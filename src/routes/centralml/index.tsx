@@ -50,7 +50,14 @@ import {
   XCircle,
 } from "lucide-react";
 import { ERRO_2FA } from "@/lib/auth-middleware";
-import { aberturaDoPainel, definirNomeDaSaudacao, definirVoz, nomeDaSaudacao, vozLigada } from "@/lib/sfx";
+import {
+  aberturaDoPainel,
+  definirNomeDaSaudacao,
+  definirVoz,
+  horaFalada,
+  nomeDaSaudacao,
+  vozLigada,
+} from "@/lib/sfx";
 import { adminBloquearCliente, adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
 import { adminAoVivo, adminBloquearIp, adminIpsBloqueados, registrarTentativaPainel } from "@/lib/monitor.functions";
 import mlLogo from "@/assets/ml-logo.png";
@@ -4076,7 +4083,8 @@ function VozDoPainel() {
       </div>
 
       <p className="mt-2 text-xs text-zinc-700">
-        Vai dizer: <b>“Olá {nome || "Don"}. Bem-vindo à central Olho de Deus.”</b>
+        Vai dizer:{" "}
+        <b>“Olá {nome || "Don"}. Bem-vindo à central Olho de Deus. {horaFalada()}.”</b>
       </p>
 
       {temVozPt === false && (

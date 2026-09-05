@@ -147,6 +147,30 @@ export function falar(texto: string, aoTerminar?: () => void): boolean {
 }
 
 /**
+ * A hora atual escrita como se fala, não como se lê num relógio.
+ *
+ * O sintetizador lê "11:15" de forma esquisita — costuma soletrar os dois
+ * pontos. Escrevendo "11 horas e 15 minutos" ele pronuncia como uma frase.
+ *
+ * Meia-noite e meio-dia ganham nome próprio porque "0 horas" e "12 horas"
+ * soam como leitura de máquina.
+ */
+export function horaFalada(agora = new Date()): string {
+  const h = agora.getHours();
+  const m = agora.getMinutes();
+
+  const base =
+    h === 0 ? "Agora é meia-noite" :
+    h === 12 ? "Agora é meio-dia" :
+    h === 1 ? "Agora é 1 hora" :
+    `Agora são ${h} horas`;
+
+  if (m === 0) return `${base} em ponto`;
+  if (m === 1) return `${base} e 1 minuto`;
+  return `${base} e ${m} minutos`;
+}
+
+/**
  * Abertura do painel: um acorde grave subindo, e então a saudação.
  *
  * O acorde vem antes de propósito — dá o instante de silêncio que faz a voz
@@ -161,10 +185,16 @@ export function aberturaDoPainel(nome?: string | null) {
   tone(220, 0.36, 0.7, 0.04);
 
   const quem = (nome ?? nomeDaSaudacao()).trim();
-  const saudacao = quem
+  const boasVindas = quem
     ? `Olá ${quem}. Bem-vindo à central Olho de Deus.`
     : "Bem-vindo à central Olho de Deus.";
 
-  // Espera o acorde terminar antes de falar.
-  setTimeout(() => falar(saudacao), 900);
+  /*
+   * A hora é lida no instante da fala, e não aqui.
+   *
+   * Entre montar a frase e o navegador começar a falar passa quase um segundo,
+   * e a lista de vozes pode demorar ainda mais. Lendo o relógio dentro do
+   * `setTimeout`, o que sai pela voz é a hora daquele momento.
+   */
+  setTimeout(() => falar(`${boasVindas} ${horaFalada()}.`), 900);
 }
