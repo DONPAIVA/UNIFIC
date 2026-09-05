@@ -329,6 +329,40 @@ function useAsync<T>(chave: unknown[], fn: () => Promise<T>, enabled = true): As
 /* ========================================================================== */
 
 /**
+ * Traduz o resultado de uma tentativa de entrada.
+ *
+ * O caso que mais importa é o `2fa_pedido`: ele significa que a SENHA ESTAVA
+ * CERTA e o acesso parou no código. Mostrado como "falhou" genérico, passaria
+ * batido — é justamente o sinal de que a senha vazou.
+ */
+function ResultadoDaTentativa({ sucesso, motivo }: { sucesso: boolean; motivo: string }) {
+  const m = String(motivo ?? "");
+
+  if (m === "2fa_pedido") {
+    return (
+      <span
+        className="font-bold text-amber-700"
+        title="A senha estava correta. O acesso parou na verificação em duas etapas."
+      >
+        ⚠ senha certa · parou no código
+      </span>
+    );
+  }
+  if (m === "2fa_codigo_errado") {
+    return <span className="font-bold text-red-700">código do app errado</span>;
+  }
+  if (m === "2fa_ok") {
+    return <span className="font-bold text-emerald-700">entrou · com código</span>;
+  }
+  if (m === "2fa_ativado") {
+    return <span className="font-bold text-emerald-700">ativou o código</span>;
+  }
+  if (sucesso) return <span className="font-bold text-emerald-700">entrou</span>;
+  if (m === "senha_errada") return <span className="font-bold text-red-700">senha errada</span>;
+  return <span className="font-bold text-red-700">falhou · {m || "sem motivo"}</span>;
+}
+
+/**
  * Segunda etapa da entrada: o código de 6 dígitos do aplicativo.
  *
  * Aparece só quando o servidor recusa por falta do segundo fator — a senha já
@@ -339,6 +373,19 @@ function TelaDoCodigo({ onOk, onSair }: { onOk: () => void; onSair: () => void }
   const [codigo, setCodigo] = useState("");
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  /*
+   * Anota que alguém chegou até aqui — senha certa, faltando o código.
+   *
+   * É o registro mais revelador do conjunto: significa que a senha vazou. Sem
+   * ele, a aba "Ao vivo" mostraria só "entrou com sucesso" e você não saberia
+   * que aquele acesso parou na segunda porta.
+   */
+  useEffect(() => {
+    void registrarTentativaPainel({
+      data: { email: "", sucesso: false, motivo: "2fa_pedido" },
+    }).catch(() => {});
+  }, []);
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2191,11 +2238,7 @@ function AoVivoTab() {
                 <td className="px-2 py-2 text-xs">{fmtDateTime(t.quando)}</td>
                 <td className="px-2 py-2 text-xs">{t.email || "—"}</td>
                 <td className="px-2 py-2 text-xs">
-                  {t.sucesso ? (
-                    <span className="font-bold text-emerald-700">entrou</span>
-                  ) : (
-                    <span className="font-bold text-red-700">falhou · {t.motivo}</span>
-                  )}
+                  <ResultadoDaTentativa sucesso={t.sucesso} motivo={t.motivo} />
                 </td>
                 <td className="px-2 py-2 font-mono text-xs">{t.ip || "—"}</td>
                 <td className="px-2 py-2 text-xs">{t.navegador}</td>

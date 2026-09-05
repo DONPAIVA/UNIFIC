@@ -11,6 +11,35 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireAdminUserSem2fa } from "./auth-middleware";
 
+/**
+ * Registra o que aconteceu no segundo fator junto das tentativas de senha.
+ *
+ * Vai para `tentativas_painel`, a mesma tabela do login — é ela que a aba
+ * "Ao vivo" mostra, com IP e navegador. Separar em outro lugar deixaria a
+ * história pela metade: você veria a senha certa e não veria que aquele
+ * mesmo acesso empacou (ou passou) no código.
+ *
+ * Falhar aqui nunca impede a entrada de quem tem a credencial certa.
+ */
+async function registrar(email: string, sucesso: boolean, motivo: string) {
+  try {
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const { db } = await import("./server/db.server");
+    const { ipDeHeaders } = await import("./server/ip.server");
+
+    const request = getRequest();
+    await db("tentativas_painel").insert({
+      email: email || null,
+      ip: ipDeHeaders(request.headers),
+      navegador: (request.headers.get("user-agent") ?? "").slice(0, 300),
+      sucesso,
+      motivo,
+    });
+  } catch {
+    /* registro é observação, não pode barrar ninguém */
+  }
+}
+
 /** Situação do segundo fator para o administrador logado. */
 export const meuSegundoFator = createServerFn({ method: "GET" })
   .middleware([requireAdminUserSem2fa])
@@ -84,8 +113,9 @@ export const conferirSegundoFator = createServerFn({ method: "POST" })
     const { db } = await import("./server/db.server");
     const { logEvent } = await import("./server/logs.server");
 
-    const registrar = (ok: boolean, motivo: string) =>
-      logEvent({
+    const anotar = (ok: boolean, motivo: string) => {
+      void registrar(context.user.email, ok, motivo);
+      void logEvent({
         category: "login",
         action: ok ? "2fa.codigo_aceito" : "2fa.codigo_recusado",
         actor: context.user.email,
@@ -94,6 +124,7 @@ export const conferirSegundoFator = createServerFn({ method: "POST" })
         error: ok ? null : motivo,
         message: ok ? "Segundo fator conferido." : "Código do segundo fator recusado.",
       }).catch(() => undefined);
+    };
 
     const { data: registro } = await db("admin_2fa")
       .select("segredo, confirmado")
@@ -105,7 +136,7 @@ export const conferirSegundoFator = createServerFn({ method: "POST" })
     }
 
     if (!codigoConfere(registro.segredo, data.codigo)) {
-      void registrar(false, "codigo_invalido");
+      anotar(false, "2fa_codigo_errado");
       throw new Error("Código incorreto. Confira o aplicativo e tente de novo.");
     }
 
@@ -119,7 +150,7 @@ export const conferirSegundoFator = createServerFn({ method: "POST" })
     }
 
     await liberarSessao(context.user.userId, token);
-    void registrar(true, "");
+    anotar(true, registro.confirmado ? "2fa_ok" : "2fa_ativado");
 
     return { ok: true, ativadoAgora: !registro.confirmado };
   });
