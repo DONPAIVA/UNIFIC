@@ -47,25 +47,6 @@ export function playError() {
 /** Onde ficam as escolhas da abertura falada. */
 const CHAVE_VOZ = "unific:voz-do-painel";
 const CHAVE_NOME = "unific:nome-na-saudacao";
-const CHAVE_ESTILO = "unific:estilo-da-abertura";
-
-export type EstiloAbertura = "padrao" | "jarvis";
-
-export function estiloDaAbertura(): EstiloAbertura {
-  try {
-    return localStorage.getItem(CHAVE_ESTILO) === "jarvis" ? "jarvis" : "padrao";
-  } catch {
-    return "padrao";
-  }
-}
-
-export function definirEstiloDaAbertura(e: EstiloAbertura) {
-  try {
-    localStorage.setItem(CHAVE_ESTILO, e);
-  } catch {
-    /* aba anônima: vale só nesta sessão */
-  }
-}
 
 /**
  * Como você quer ser chamado na abertura.
@@ -117,24 +98,11 @@ export function definirVoz(ligada: boolean) {
 function melhorVoz(): SpeechSynthesisVoice | null {
   const vozes = window.speechSynthesis?.getVoices?.() ?? [];
   if (!vozes.length) return null;
-
-  const brasileiras = vozes.filter((v) => /pt[-_]BR/i.test(v.lang));
-  const portuguesas = vozes.filter((v) => /^pt/i.test(v.lang));
-  const candidatas = brasileiras.length ? brasileiras : portuguesas;
-  if (!candidatas.length) return null;
-
-  /*
-   * No modo JARVIS, voz masculina.
-   *
-   * A API não diz o gênero da voz, então vai pelo nome — os aparelhos
-   * brasileiros trazem quase sempre Daniel (masculina) e Maria (feminina).
-   * Não achando nenhuma conhecida, fica a primeira, que ainda funciona.
-   */
-  if (estiloDaAbertura() === "jarvis") {
-    const masculina = candidatas.find((v) => /daniel|ricardo|felipe|male|homem/i.test(v.name));
-    if (masculina) return masculina;
-  }
-  return candidatas[0] ?? null;
+  return (
+    vozes.find((v) => /pt[-_]BR/i.test(v.lang)) ??
+    vozes.find((v) => /^pt/i.test(v.lang)) ??
+    null
+  );
 }
 
 /**
@@ -154,15 +122,9 @@ export function falar(texto: string, aoTerminar?: () => void): boolean {
       const voz = melhorVoz();
       if (voz) fala.voice = voz;
       fala.lang = voz?.lang ?? "pt-BR";
-      /*
-       * No modo JARVIS, mais grave e mais pausado ainda.
-       *
-       * Descer o tom além disso passa a soar rasgado — o sintetizador do
-       * navegador estica demais a voz e aparece um chiado metálico.
-       */
-      const jarvis = estiloDaAbertura() === "jarvis";
-      fala.rate = jarvis ? 0.86 : 0.92;
-      fala.pitch = jarvis ? 0.62 : 0.85;
+      // Um pouco mais devagar e mais grave: dá peso à frase.
+      fala.rate = 0.92;
+      fala.pitch = 0.85;
       fala.volume = 1;
       if (aoTerminar) fala.onend = aoTerminar;
       window.speechSynthesis.cancel();
@@ -190,120 +152,19 @@ export function falar(texto: string, aoTerminar?: () => void): boolean {
  * O acorde vem antes de propósito — dá o instante de silêncio que faz a voz
  * soar como anúncio, em vez de um alerta seco do sistema.
  */
-/**
- * Varredura de energia: um tom que sobe e abre o filtro, como um sistema
- * ligando. É o som que dá a sensação de "acordando" antes da voz.
- */
-function varredura(inicio: number, dur: number) {
-  const ac = audio();
-  if (!ac) return;
-  const t0 = ac.currentTime + inicio;
-
-  const osc = ac.createOscillator();
-  const filtro = ac.createBiquadFilter();
-  const g = ac.createGain();
-
-  osc.type = "sawtooth";
-  osc.frequency.setValueAtTime(60, t0);
-  osc.frequency.exponentialRampToValueAtTime(420, t0 + dur);
-
-  filtro.type = "lowpass";
-  filtro.frequency.setValueAtTime(200, t0);
-  filtro.frequency.exponentialRampToValueAtTime(3200, t0 + dur);
-  filtro.Q.value = 8;
-
-  g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(0.05, t0 + dur * 0.6);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-
-  osc.connect(filtro).connect(g).connect(ac.destination);
-  osc.start(t0);
-  osc.stop(t0 + dur + 0.05);
-}
-
-/**
- * Zumbido baixo que fica por baixo da fala, como um reator ligado.
- *
- * Devolve a função que o desliga: sem ela o zumbido ficaria tocando para
- * sempre, porque não tem duração definida.
- */
-function zumbido(): () => void {
-  const ac = audio();
-  if (!ac) return () => {};
-  const t0 = ac.currentTime;
-
-  const grave = ac.createOscillator();
-  const quinta = ac.createOscillator();
-  const g = ac.createGain();
-
-  grave.type = "sine";
-  grave.frequency.value = 55;
-  quinta.type = "sine";
-  // Levemente desafinada de propósito: o batimento entre as duas cria o
-  // "vivo" do zumbido. Afinadas, soaria como um bipe parado.
-  quinta.frequency.value = 82.9;
-
-  g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(0.022, t0 + 0.6);
-
-  grave.connect(g);
-  quinta.connect(g);
-  g.connect(ac.destination);
-  grave.start(t0);
-  quinta.start(t0);
-
-  return () => {
-    const fim = ac.currentTime;
-    g.gain.cancelScheduledValues(fim);
-    g.gain.setValueAtTime(g.gain.value, fim);
-    g.gain.exponentialRampToValueAtTime(0.0001, fim + 0.9);
-    grave.stop(fim + 1);
-    quinta.stop(fim + 1);
-  };
-}
-
-export function aberturaDoPainel(nome?: string | null, estilo?: EstiloAbertura) {
+export function aberturaDoPainel(nome?: string | null) {
   if (!vozLigada()) return;
-
-  const quem = (nome ?? nomeDaSaudacao()).trim();
-  const modo = estilo ?? estiloDaAbertura();
-
-  if (modo === "jarvis") {
-    /*
-     * Não é a voz do filme — nenhum navegador tem aquela voz, e não há como
-     * instalá-la. O que dá para reproduzir é o entorno: a varredura de
-     * energia, os blips de leitura e o zumbido sob a fala. É de onde vem a
-     * maior parte da sensação; a voz sozinha nunca soaria assim.
-     */
-    varredura(0, 1.1);
-    tone(1318.51, 0.75, 0.06, 0.03); // blips de leitura
-    tone(1567.98, 0.88, 0.06, 0.03);
-    tone(1975.53, 1.0, 0.08, 0.035);
-
-    const desligar = zumbido();
-    const frase = quem
-      ? `Bem-vindo de volta, ${quem}. Todos os sistemas operacionais. Central Olho de Deus à sua disposição.`
-      : "Todos os sistemas operacionais. Central Olho de Deus à sua disposição.";
-
-    setTimeout(() => {
-      const falou = falar(frase, () => {
-        tone(880, 0, 0.1, 0.03);
-        desligar();
-      });
-      // Sem voz disponível, o zumbido não pode ficar tocando sozinho.
-      if (!falou) setTimeout(desligar, 400);
-    }, 1250);
-    return;
-  }
 
   // Três notas graves em sequência, subindo.
   tone(110, 0, 0.5, 0.05);
   tone(164.81, 0.18, 0.5, 0.045);
   tone(220, 0.36, 0.7, 0.04);
 
+  const quem = (nome ?? nomeDaSaudacao()).trim();
   const saudacao = quem
     ? `Olá ${quem}. Bem-vindo à central Olho de Deus.`
     : "Bem-vindo à central Olho de Deus.";
 
+  // Espera o acorde terminar antes de falar.
   setTimeout(() => falar(saudacao), 900);
 }
