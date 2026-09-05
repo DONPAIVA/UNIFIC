@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, Loader2, MapPin, Plus, Save, Trash2, X } from "lucide-react";
-import { deletePedido, listPedidos, listTable, savePedido } from "@/lib/api";
+import { ERRO_2FA } from "@/lib/auth-middleware";
+import {
+  adminExcluirPedido,
+  adminListarPedidos,
+  adminListarTabela,
+  adminSalvarPedido,
+} from "@/lib/pedidos.functions";
 import { lookupCep, maskCep, onlyDigits, type CepInfo } from "@/lib/cep";
 import { MARKETPLACES } from "@/lib/marketplaces";
 import { eventosDoPedido, fmtDate, money, progressOf, statusFor, type Pedido } from "@/lib/tracking";
@@ -277,7 +283,155 @@ function EventosDoHistorico({
   );
 }
 
-const ADMIN_PASS = "unific2026";
+/** E-mail e senha do administrador — o mesmo acesso da Olho de Deus ML. */
+function EntrarNoPainel({ onEntrou }: { onEntrou: () => void }) {
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setErro(null);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: senha,
+      });
+
+      // Toda tentativa fica registrada, com IP, na aba "Ao vivo".
+      const { registrarTentativaPainel } = await import("@/lib/monitor.functions");
+      void registrarTentativaPainel({
+        data: {
+          email: email.trim(),
+          sucesso: !error,
+          motivo: error ? "senha_errada" : "ok",
+        },
+      }).catch(() => {});
+
+      if (error) {
+        setErro("E-mail ou senha incorretos.");
+        setBusy(false);
+        return;
+      }
+      onEntrou();
+    } catch {
+      setErro("Não foi possível entrar. Tente novamente.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={enviar} className="mx-auto max-w-sm space-y-3 py-6">
+      <p className="text-sm text-muted-foreground">
+        Entre com a mesma conta de administrador da Olho de Deus ML.
+      </p>
+      <input
+        type="email"
+        required
+        autoFocus
+        autoComplete="username"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="seu@email.com"
+        className="w-full rounded-md border border-input bg-white px-3 py-2 text-sm text-card-foreground"
+      />
+      <input
+        type="password"
+        required
+        autoComplete="current-password"
+        value={senha}
+        onChange={(e) => setSenha(e.target.value)}
+        placeholder="Senha"
+        className="w-full rounded-md border border-input bg-white px-3 py-2 text-sm text-card-foreground"
+      />
+      {erro && <p className="text-xs font-bold text-destructive">{erro}</p>}
+      <button
+        type="submit"
+        disabled={busy}
+        className="w-full rounded-md bg-primary py-2 text-sm font-bold text-primary-foreground disabled:opacity-60"
+      >
+        {busy ? "Entrando..." : "Entrar"}
+      </button>
+    </form>
+  );
+}
+
+/** Segunda etapa: o código de 6 dígitos do aplicativo autenticador. */
+function CodigoDoPainel({ onOk, onSair }: { onOk: () => void; onSair: () => void }) {
+  const [codigo, setCodigo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  // Anota que alguém chegou aqui: senha certa, parada no código.
+  useEffect(() => {
+    void (async () => {
+      const { registrarTentativaPainel } = await import("@/lib/monitor.functions");
+      void registrarTentativaPainel({
+        data: { email: "", sucesso: false, motivo: "2fa_pedido" },
+      }).catch(() => {});
+    })();
+  }, []);
+
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (codigo.length !== 6) {
+      setErro("Digite os 6 números do aplicativo.");
+      return;
+    }
+    setBusy(true);
+    setErro(null);
+    try {
+      const { conferirSegundoFator } = await import("@/lib/dois-fatores.functions");
+      await conferirSegundoFator({ data: { codigo } });
+      onOk();
+    } catch (e2) {
+      setBusy(false);
+      setCodigo("");
+      setErro(e2 instanceof Error ? e2.message : "Código incorreto.");
+    }
+  };
+
+  const sair = async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    await supabase.auth.signOut();
+    onSair();
+  };
+
+  return (
+    <form onSubmit={enviar} className="mx-auto max-w-sm space-y-3 py-6">
+      <p className="text-sm text-muted-foreground">
+        Digite o número de 6 dígitos do seu aplicativo autenticador.
+      </p>
+      <input
+        value={codigo}
+        onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        autoFocus
+        placeholder="000000"
+        className="w-full rounded-md border border-input bg-white px-3 py-3 text-center font-mono text-2xl tracking-[0.4em] text-card-foreground"
+      />
+      {erro && <p className="text-xs font-bold text-destructive">{erro}</p>}
+      <button
+        type="submit"
+        disabled={busy}
+        className="w-full rounded-md bg-primary py-2 text-sm font-bold text-primary-foreground disabled:opacity-60"
+      >
+        {busy ? "Conferindo..." : "Entrar"}
+      </button>
+      <button
+        type="button"
+        onClick={() => void sair()}
+        className="w-full text-center text-[11px] font-semibold text-muted-foreground underline"
+      >
+        Sair e entrar com outra conta
+      </button>
+    </form>
+  );
+}
 const STATUSES = ["Aguardando postagem", "Em trânsito", "Saiu para entrega", "Entregue", "Aguardando retirada", "Extraviado"];
 
 const empty = {
@@ -313,44 +467,66 @@ const empty = {
 type Form = typeof empty & { id?: string };
 
 export function AdminPanel({ onClose }: { onClose: () => void }) {
-  const [authed, setAuthed] = useState(() =>
-    typeof window !== "undefined" ? sessionStorage.getItem("unific_admin") === "1" : false,
+  /*
+   * Entrada pelo mesmo login da Olho de Deus ML.
+   *
+   * A senha fixa que existia aqui NÃO protegia nada: ela ficava escrita no
+   * arquivo que todo visitante baixa, e o banco aceitava criar, editar e
+   * apagar pedido com a chave pública, sem passar por este painel.
+   *
+   * Agora quem manda é o servidor. `adminSession` exige administrador e,
+   * quando ativado, o segundo fator — a mesma trava do outro painel.
+   */
+  const [estado, setEstado] = useState<"verificando" | "entrar" | "codigo" | "dentro">(
+    "verificando",
   );
-  const [pass, setPass] = useState("");
   const [tab, setTab] = useState<"pedidos" | "nf" | "reclamacoes" | "cotacoes">("pedidos");
 
-  if (!authed) {
+  const conferir = useCallback(async () => {
+    setEstado("verificando");
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        setEstado("entrar");
+        return;
+      }
+      const { adminSession } = await import("@/lib/centralml.functions");
+      await adminSession();
+      setEstado("dentro");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Senha certa, faltando o código do aplicativo.
+      setEstado(msg.includes(ERRO_2FA) ? "codigo" : "entrar");
+    }
+  }, []);
+
+  useEffect(() => {
+    void conferir();
+  }, [conferir]);
+
+  if (estado === "verificando") {
     return (
-      <Shell onClose={onClose} title="Painel Oculto — Acesso Restrito">
-        <div className="mx-auto max-w-sm space-y-3 py-6">
-          <p className="text-sm text-muted-foreground">Digite a senha do painel administrativo.</p>
-          <input
-            type="password"
-            autoFocus
-            value={pass}
-            onChange={(e) => setPass(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              if (pass === ADMIN_PASS) {
-                sessionStorage.setItem("unific_admin", "1");
-                setAuthed(true);
-              } else toast.error("Senha incorreta");
-            }}
-            placeholder="Senha"
-            className="w-full rounded-md border border-input bg-white px-3 py-2 text-sm text-card-foreground"
-          />
-          <button
-            onClick={() => {
-              if (pass === ADMIN_PASS) {
-                sessionStorage.setItem("unific_admin", "1");
-                setAuthed(true);
-              } else toast.error("Senha incorreta");
-            }}
-            className="w-full rounded-md bg-primary py-2 text-sm font-bold text-primary-foreground"
-          >
-            Entrar
-          </button>
+      <Shell onClose={onClose} title="Painel Únific+ — Administração">
+        <div className="flex justify-center py-10">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
+      </Shell>
+    );
+  }
+
+  if (estado === "entrar") {
+    return (
+      <Shell onClose={onClose} title="Painel Únific+ — Administração">
+        <EntrarNoPainel onEntrou={() => void conferir()} />
+      </Shell>
+    );
+  }
+
+  if (estado === "codigo") {
+    return (
+      <Shell onClose={onClose} title="Painel Únific+ — Administração">
+        <CodigoDoPainel onOk={() => void conferir()} onSair={() => void conferir()} />
       </Shell>
     );
   }
@@ -396,7 +572,10 @@ function Shell({ children, onClose, title }: { children: React.ReactNode; onClos
 
 function PedidosAdmin() {
   const qc = useQueryClient();
-  const { data: pedidos, isLoading } = useQuery({ queryKey: ["pedidos"], queryFn: listPedidos });
+  const { data: pedidos, isLoading } = useQuery({
+    queryKey: ["pedidos-admin"],
+    queryFn: async () => (await adminListarPedidos()).pedidos as Pedido[],
+  });
   const [form, setForm] = useState<Form | null>(null);
 
   const save = useMutation({
@@ -415,7 +594,9 @@ function PedidosAdmin() {
         // Sem nenhum ajuste, grava nulo — nao um objeto vazio sem sentido.
         eventos_ajustes: Object.keys(f.eventos_ajustes ?? {}).length ? f.eventos_ajustes : null,
       };
-      await savePedido(payload as Partial<Pedido> & { tracking_code: string });
+      // Só manda `id` quando existe: com exactOptionalPropertyTypes ligado,
+      // uma chave presente valendo undefined não é o mesmo que ausente.
+      await adminSalvarPedido({ data: f.id ? { id: f.id, dados: payload } : { dados: payload } });
     },
     onSuccess: () => {
       toast.success("Pedido salvo e sincronizado com o site!");
@@ -426,7 +607,7 @@ function PedidosAdmin() {
   });
 
   const remove = useMutation({
-    mutationFn: deletePedido,
+    mutationFn: (id: string) => adminExcluirPedido({ data: { id } }),
     onSuccess: () => {
       toast.success("Pedido removido");
       void qc.invalidateQueries({ queryKey: ["pedidos"] });
@@ -617,7 +798,10 @@ function PedidosAdmin() {
 }
 
 function TableView({ table }: { table: "reclamacoes" | "solicitacoes_nf" | "cotacoes_frete" }) {
-  const { data, isLoading } = useQuery({ queryKey: [table], queryFn: () => listTable(table) });
+  const { data, isLoading } = useQuery({
+    queryKey: ["tabela-admin", table],
+    queryFn: async () => (await adminListarTabela({ data: { tabela: table } })).linhas,
+  });
   if (isLoading) return <Loader2 className="h-5 w-5 animate-spin" />;
   const rows = data ?? [];
   if (rows.length === 0) return <p className="py-6 text-center text-sm text-muted-foreground">Nenhum registro.</p>;
@@ -629,7 +813,7 @@ function TableView({ table }: { table: "reclamacoes" | "solicitacoes_nf" | "cota
           <tr>{cols.map((c) => <th key={c} className="p-2">{c.replace(/_/g, " ")}</th>)}</tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
+          {rows.map((r: Record<string, unknown>, i: number) => (
             <tr key={i} className="border-b border-border">
               {cols.map((c) => (
                 <td key={c} className="p-2">{String(r[c] ?? "—").slice(0, 60)}</td>

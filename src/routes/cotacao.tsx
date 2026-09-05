@@ -47,8 +47,14 @@ function CotacaoPage() {
 
   const buscar = useMutation({
     mutationFn: async () => {
-      const rows = await listTable("cotacoes_frete");
-      return rows.filter((r) => String(r["cpf"] ?? "") === cpf.trim());
+      // O filtro acontece no SERVIDOR. A versão anterior baixava a tabela
+      // inteira e escolhia no navegador, entregando as cotações de todos os
+      // clientes — com nome e telefone — a quem abrisse a aba de rede.
+      const { cotacoesDoCpf } = await import("@/lib/pedidos.functions");
+      const r = (await cotacoesDoCpf({ data: { cpf: cpf.trim() } })) as {
+        cotacoes: Record<string, unknown>[];
+      };
+      return r.cotacoes;
     },
     onSuccess: (rows) => setFretes(rows),
   });
