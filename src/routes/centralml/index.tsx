@@ -49,6 +49,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
+import { ERRO_2FA } from "@/lib/auth-middleware";
 import { adminBloquearCliente, adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
 import { adminAoVivo, adminBloquearIp, adminIpsBloqueados, registrarTentativaPainel } from "@/lib/monitor.functions";
 import mlLogo from "@/assets/ml-logo.png";
@@ -327,6 +328,93 @@ function useAsync<T>(chave: unknown[], fn: () => Promise<T>, enabled = true): As
 /* Login                                                                      */
 /* ========================================================================== */
 
+/**
+ * Segunda etapa da entrada: o código de 6 dígitos do aplicativo.
+ *
+ * Aparece só quando o servidor recusa por falta do segundo fator — a senha já
+ * foi aceita neste ponto. Sair daqui encerra a sessão, para não deixar meia
+ * entrada aberta em máquina compartilhada.
+ */
+function TelaDoCodigo({ onOk, onSair }: { onOk: () => void; onSair: () => void }) {
+  const [codigo, setCodigo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (codigo.length !== 6) {
+      setErro("Digite os 6 números do aplicativo.");
+      return;
+    }
+    setBusy(true);
+    setErro(null);
+    try {
+      const { conferirSegundoFator } = await import("@/lib/dois-fatores.functions");
+      await conferirSegundoFator({ data: { codigo } });
+      onOk();
+    } catch (e2) {
+      setBusy(false);
+      setCodigo("");
+      setErro(errorMessage(e2));
+    }
+  };
+
+  // O fundo Matrix é global e já aparece atrás desta tela.
+  return (
+    <div className="flex min-h-screen items-center justify-center px-4 text-zinc-900">
+      <form
+        onSubmit={enviar}
+        className="relative z-10 w-full max-w-sm rounded-2xl border-4 border-[#FFE600] bg-white p-6 shadow-2xl"
+      >
+        <div className="flex items-center gap-3">
+          <img src={mlLogo} alt="" className="h-10 w-10 rounded-xl" width={40} height={40} />
+          <div className="leading-none">
+            <span className="block text-lg font-black tracking-tight text-[#2D3277]">
+              VERIFICAÇÃO EM DUAS ETAPAS
+            </span>
+            <span className="mt-1 block text-[11px] font-bold text-zinc-700">
+              Olho de Deus ML
+            </span>
+          </div>
+        </div>
+
+        <p className="mt-4 text-xs text-zinc-700">
+          Abra seu aplicativo autenticador e digite o número de 6 dígitos que aparece para o
+          Olho de Deus ML.
+        </p>
+
+        <input
+          value={codigo}
+          onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          autoFocus
+          placeholder="000000"
+          className="mt-4 w-full rounded-xl border-2 border-zinc-300 bg-white px-3 py-3 text-center font-mono text-2xl tracking-[0.4em] text-zinc-900 outline-none focus:border-[#3483FA]"
+        />
+
+        {erro && <p className="mt-3 text-xs font-bold text-red-700">{erro}</p>}
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="mt-4 w-full rounded-xl bg-[#3483FA] py-3 text-sm font-black text-white disabled:opacity-60"
+        >
+          {busy ? "CONFERINDO..." : "ENTRAR"}
+        </button>
+
+        <button
+          type="button"
+          onClick={onSair}
+          className="mt-3 w-full text-center text-[11px] font-semibold text-zinc-600 underline"
+        >
+          Sair e entrar com outra conta
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: string | null }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -601,22 +689,39 @@ function CentralML() {
   /** Conta selecionada — todas as abas filtram por ela quando definida. */
   const [accountId, setAccountId] = useState<string | null>(null);
 
+  /** Senha aceita, mas falta o código de 6 dígitos do aplicativo. */
+  const [pedindoCodigo, setPedindoCodigo] = useState(false);
+
   const check = useCallback(async () => {
     setChecking(true);
     try {
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
         setSession(null);
+        setPedindoCodigo(false);
         setNotice(null);
         return;
       }
       // O servidor é quem decide: sessão válida ≠ acesso administrativo.
       const me = await adminSession();
       setSession(me);
+      setPedindoCodigo(false);
       setNotice(null);
     } catch (e) {
-      setSession(null);
-      setNotice(errorMessage(e));
+      /*
+       * O servidor recusou por falta do segundo fator, não por credencial
+       * errada. Aqui isso vira a tela do código — mandar de volta para o login
+       * faria a pessoa digitar a senha de novo e cair no mesmo lugar.
+       */
+      if (String(errorMessage(e)).includes(ERRO_2FA)) {
+        setSession(null);
+        setPedindoCodigo(true);
+        setNotice(null);
+      } else {
+        setSession(null);
+        setPedindoCodigo(false);
+        setNotice(errorMessage(e));
+      }
     } finally {
       setChecking(false);
     }
@@ -629,6 +734,7 @@ function CentralML() {
   const signOut = async () => {
     await supabase.auth.signOut();
     setSession(null);
+    setPedindoCodigo(false);
     setNotice(null);
   };
 
@@ -638,6 +744,10 @@ function CentralML() {
         <LoaderCircle className="h-10 w-10 animate-spin text-[#00ff41]" />
       </div>
     );
+  }
+
+  if (pedindoCodigo) {
+    return <TelaDoCodigo onOk={() => void check()} onSair={() => void signOut()} />;
   }
 
   if (!session) {
@@ -3846,6 +3956,193 @@ function ConsoleTab({ accountId }: { accountId: string | null }) {
 /* Configurações                                                              */
 /* ========================================================================== */
 
+/**
+ * Ativar e desativar a verificação em duas etapas.
+ *
+ * A ativação tem duas partes de propósito: primeiro o segredo é gerado e
+ * guardado como NÃO confirmado, e só passa a valer depois que um código certo
+ * é digitado. Sem essa confirmação, um segredo gerado e nunca salvo no celular
+ * trancaria o administrador para fora do próprio painel.
+ */
+function SegundoFatorPainel() {
+  const [estado, setEstado] = useState<{ ativo: boolean } | null>(null);
+  const [segredo, setSegredo] = useState<string | null>(null);
+  const [endereco, setEndereco] = useState<string | null>(null);
+  const [codigo, setCodigo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [desativando, setDesativando] = useState(false);
+
+  const carregar = useCallback(async () => {
+    try {
+      const { meuSegundoFator } = await import("@/lib/dois-fatores.functions");
+      setEstado(await meuSegundoFator());
+    } catch {
+      setEstado(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
+
+  const preparar = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const { ativarSegundoFator } = await import("@/lib/dois-fatores.functions");
+      const r = await ativarSegundoFator();
+      setSegredo(r.segredo);
+      setEndereco(r.endereco);
+    } catch (e) {
+      setMsg({ ok: false, texto: errorMessage(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmar = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const { conferirSegundoFator } = await import("@/lib/dois-fatores.functions");
+      await conferirSegundoFator({ data: { codigo } });
+      setSegredo(null);
+      setEndereco(null);
+      setCodigo("");
+      setMsg({ ok: true, texto: "Verificação em duas etapas ativada." });
+      void carregar();
+    } catch (e) {
+      setMsg({ ok: false, texto: errorMessage(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const desativar = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const { desativarSegundoFator } = await import("@/lib/dois-fatores.functions");
+      await desativarSegundoFator({ data: { codigo } });
+      setCodigo("");
+      setDesativando(false);
+      setMsg({ ok: true, texto: "Verificação em duas etapas desligada." });
+      void carregar();
+    } catch (e) {
+      setMsg({ ok: false, texto: errorMessage(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Panel title="Verificação em duas etapas">
+      {msg && (
+        <p className={`mb-3 text-xs font-bold ${msg.ok ? "text-emerald-700" : "text-red-700"}`}>
+          {msg.texto}
+        </p>
+      )}
+
+      {estado?.ativo ? (
+        <>
+          <p className="text-sm text-zinc-700">
+            <span className="font-bold text-emerald-700">Ativa.</span> Além da senha, entrar no
+            painel pede o código de 6 dígitos do seu aplicativo.
+          </p>
+          {desativando ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                inputMode="numeric"
+                placeholder="000000"
+                className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-center font-mono text-sm"
+              />
+              <button
+                onClick={() => void desativar()}
+                disabled={busy || codigo.length !== 6}
+                className="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
+              >
+                Confirmar e desligar
+              </button>
+              <button
+                onClick={() => { setDesativando(false); setCodigo(""); }}
+                className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-bold"
+              >
+                Cancelar
+              </button>
+              {/* Desligar também exige o código: com só a senha, a proteção
+                  poderia ser removida por quem ela deveria barrar. */}
+              <span className="text-[11px] text-zinc-600">
+                Digite um código do aplicativo para confirmar.
+              </span>
+            </div>
+          ) : (
+            <button
+              onClick={() => setDesativando(true)}
+              className="mt-3 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-bold"
+            >
+              Desligar
+            </button>
+          )}
+        </>
+      ) : segredo ? (
+        <>
+          <p className="text-sm text-zinc-700">
+            No seu aplicativo autenticador — Google Authenticator, Authy, 1Password —, escolha
+            adicionar conta <b>manualmente</b> e informe esta chave:
+          </p>
+          <p className="mt-2 select-all break-all rounded-lg border-2 border-[#FFE600] bg-[#FFFBE0] px-3 py-2 font-mono text-sm font-bold">
+            {segredo}
+          </p>
+          <p className="mt-2 text-[11px] text-zinc-600">
+            Guarde esta chave num lugar seguro. Perdendo o celular sem ela, você fica sem acesso
+            ao painel.
+          </p>
+          {endereco && (
+            <p className="mt-2 select-all break-all text-[10px] text-zinc-500">{endereco}</p>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              inputMode="numeric"
+              placeholder="000000"
+              className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-center font-mono text-sm"
+            />
+            <button
+              onClick={() => void confirmar()}
+              disabled={busy || codigo.length !== 6}
+              className="rounded-lg bg-[#3483FA] px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
+            >
+              Confirmar e ativar
+            </button>
+            <span className="text-[11px] text-zinc-600">
+              Digite o número que o aplicativo mostrar agora.
+            </span>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-zinc-700">
+            Hoje o painel abre só com e-mail e senha. Quem descobrir a senha vê contas, tokens,
+            pedidos e dados de cliente.
+          </p>
+          <button
+            onClick={() => void preparar()}
+            disabled={busy}
+            className="mt-3 rounded-lg bg-[#3483FA] px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
+          >
+            {busy ? "Preparando..." : "Ativar verificação em duas etapas"}
+          </button>
+        </>
+      )}
+    </Panel>
+  );
+}
+
 function ConfiguracoesTab({ isAdmin }: { isAdmin: boolean }) {
   // adminConfig expõe o estado da integração e a lista de administradores:
   // é função de administrador. O cliente comum vê apenas o diagnóstico.
@@ -3906,6 +4203,8 @@ function ConfiguracoesTab({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <>
+      <SegundoFatorPainel />
+
       <DiagnosticoOAuth />
 
       <Panel title="Integração Mercado Livre">
