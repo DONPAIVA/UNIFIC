@@ -50,7 +50,16 @@ import {
   XCircle,
 } from "lucide-react";
 import { ERRO_2FA } from "@/lib/auth-middleware";
-import { aberturaDoPainel, definirNomeDaSaudacao, definirVoz, nomeDaSaudacao, vozLigada } from "@/lib/sfx";
+import {
+  aberturaDoPainel,
+  definirEstiloDaAbertura,
+  definirNomeDaSaudacao,
+  definirVoz,
+  estiloDaAbertura,
+  nomeDaSaudacao,
+  vozLigada,
+  type EstiloAbertura,
+} from "@/lib/sfx";
 import { adminBloquearCliente, adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
 import { adminAoVivo, adminBloquearIp, adminIpsBloqueados, registrarTentativaPainel } from "@/lib/monitor.functions";
 import mlLogo from "@/assets/ml-logo.png";
@@ -4029,11 +4038,13 @@ function ConsoleTab({ accountId }: { accountId: string | null }) {
 function VozDoPainel() {
   const [ligada, setLigada] = useState(true);
   const [nome, setNome] = useState("");
+  const [estilo, setEstilo] = useState<EstiloAbertura>("padrao");
   const [temVozPt, setTemVozPt] = useState<boolean | null>(null);
 
   useEffect(() => {
     setLigada(vozLigada());
     setNome(nomeDaSaudacao());
+    setEstilo(estiloDaAbertura());
 
     const conferir = () => {
       const vozes = window.speechSynthesis?.getVoices?.() ?? [];
@@ -4060,6 +4071,28 @@ function VozDoPainel() {
         Falar ao entrar no painel
       </label>
 
+      <div className="mt-3 flex flex-wrap gap-2">
+        {(
+          [
+            ["padrao", "Padrão"],
+            ["jarvis", "JARVIS"],
+          ] as const
+        ).map(([id, rotulo]) => (
+          <button
+            key={id}
+            onClick={() => {
+              setEstilo(id);
+              definirEstiloDaAbertura(id);
+            }}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+              estilo === id ? "bg-[#3483FA] text-white" : "border border-zinc-300 text-zinc-700"
+            }`}
+          >
+            {rotulo}
+          </button>
+        ))}
+      </div>
+
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="text-xs font-bold text-zinc-700">Me chame de</span>
         <input
@@ -4073,7 +4106,7 @@ function VozDoPainel() {
           className="w-40 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm"
         />
         <button
-          onClick={() => aberturaDoPainel(nome || undefined)}
+          onClick={() => aberturaDoPainel(nome || undefined, estilo)}
           disabled={!ligada}
           className="rounded-lg bg-[#3483FA] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
         >
@@ -4082,8 +4115,21 @@ function VozDoPainel() {
       </div>
 
       <p className="mt-2 text-xs text-zinc-700">
-        Vai dizer: <b>“Olá {nome || "Don"}. Bem-vindo à central Olho de Deus.”</b>
+        Vai dizer:{" "}
+        <b>
+          {estilo === "jarvis"
+            ? `“Bem-vindo de volta, ${nome || "Don"}. Todos os sistemas operacionais. Central Olho de Deus à sua disposição.”`
+            : `“Olá ${nome || "Don"}. Bem-vindo à central Olho de Deus.”`}
+        </b>
       </p>
+
+      {estilo === "jarvis" && (
+        <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">
+          Não é a voz do filme — nenhum navegador tem aquela voz, e não há como instalá-la. O que
+          este modo faz é usar a voz masculina do aparelho, mais grave e pausada, com a varredura
+          de energia, os blips de leitura e o zumbido por baixo da fala.
+        </p>
+      )}
 
       {temVozPt === false && (
         <p className="mt-2 text-xs font-bold text-amber-700">
