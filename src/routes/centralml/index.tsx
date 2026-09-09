@@ -41,6 +41,7 @@ import {
   ShieldCheck,
   Tag,
   ArrowRight,
+  ChevronDown,
   Eye,
   EyeOff,
   Terminal,
@@ -744,6 +745,36 @@ function CentralML() {
   /** Conta selecionada — todas as abas filtram por ela quando definida. */
   const [accountId, setAccountId] = useState<string | null>(null);
 
+  /*
+   * Grupos abertos na navegação.
+   *
+   * Começa só com o grupo da aba atual. Deixar todos fechados economizaria
+   * mais espaço, mas esconderia onde você está — e a primeira coisa a fazer
+   * seria abrir justamente aquele grupo. Os outros três ficam recolhidos.
+   */
+  const [gruposAbertos, setGruposAbertos] = useState<Grupo[]>(() => {
+    const inicial = TABS.find((t) => t.id === "dashboard")?.grupo;
+    return inicial ? [inicial] : [];
+  });
+
+  const alternarGrupo = (g: Grupo) =>
+    setGruposAbertos((atuais) =>
+      atuais.includes(g) ? atuais.filter((x) => x !== g) : [...atuais, g],
+    );
+
+  /**
+   * Troca de aba abrindo o grupo dela.
+   *
+   * Sem isto, escolher uma aba por outro caminho — um atalho do painel, por
+   * exemplo — deixaria a navegação apontando para um grupo fechado, e não
+   * daria para ver onde você está.
+   */
+  const irParaAba = (id: TabId) => {
+    setTab(id);
+    const grupo = TABS.find((t) => t.id === id)?.grupo;
+    if (grupo) setGruposAbertos((atuais) => (atuais.includes(grupo) ? atuais : [...atuais, grupo]));
+  };
+
   /** Senha aceita, mas falta o código de 6 dígitos do aplicativo. */
   const [pedindoCodigo, setPedindoCodigo] = useState(false);
 
@@ -886,56 +917,91 @@ function CentralML() {
           */}
           <nav className="mt-4 overflow-hidden rounded-2xl border-2 border-zinc-200 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.22)]">
             <div className="h-1.5 w-full bg-[#FFE600]" />
-            <div className="grid gap-px bg-zinc-200 sm:grid-cols-2 xl:grid-cols-4">
-              {GRUPOS.map((grupo) => (
-                <div key={grupo} className="flex flex-col bg-white p-4">
-                  <span className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-[#1F5FD4]">
-                    <span className="h-4 w-1.5 rounded-full bg-[#FFE600]" />
-                    {grupo}
-                  </span>
 
-                  <div className="flex flex-col gap-1.5">
-                    {TABS.filter((t) => t.grupo === grupo).map(({ id, label, icon: Icon }) => {
-                      const ativa = tab === id;
-                      return (
-                        <button
-                          key={id}
-                          onClick={() => setTab(id)}
-                          className={`group flex w-full items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left text-sm font-bold transition-all ${
-                            ativa
-                              ? // Amarelo com texto azul-marinho: o par de cores do
-                                // Mercado Livre, e destaca mais que o azul cheio,
-                                // que competia com os botões de ação.
-                                "border-[#FFE600] bg-[#FFE600] text-[#2D3277] shadow-md"
-                              : "border-transparent bg-zinc-50 text-zinc-700 hover:border-[#FFE600] hover:bg-white hover:text-[#1F5FD4]"
-                          }`}
-                        >
-                          <span
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
+            {GRUPOS.map((grupo, indice) => {
+              const abas = TABS.filter((t) => t.grupo === grupo);
+              const aberto = gruposAbertos.includes(grupo);
+              const aqui = abas.some((a) => a.id === tab);
+
+              return (
+                <div key={grupo} className={indice > 0 ? "border-t border-zinc-200" : ""}>
+                  <button
+                    onClick={() => alternarGrupo(grupo)}
+                    aria-expanded={aberto}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[#FFFBE0]"
+                  >
+                    <span className="h-5 w-1.5 shrink-0 rounded-full bg-[#FFE600]" />
+                    <span className="text-sm font-black uppercase tracking-[0.12em] text-[#1F5FD4]">
+                      {grupo}
+                    </span>
+
+                    {/* Fechado com a aba atual dentro: o ponto amarelo diz onde
+                        você está sem precisar abrir para procurar. */}
+                    {!aberto && aqui && (
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#FFE600] ring-2 ring-[#2D3277]" />
+                    )}
+
+                    <span className="ml-auto flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-zinc-600">{abas.length}</span>
+                      <ChevronDown
+                        className={`h-5 w-5 text-[#2D3277] transition-transform duration-200 ${
+                          aberto ? "rotate-180" : ""
+                        }`}
+                      />
+                    </span>
+                  </button>
+
+                  {aberto && (
+                    <div className="grid gap-2 px-4 pb-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {abas.map(({ id, label, icon: Icon }) => {
+                        const ativa = tab === id;
+                        return (
+                          <button
+                            key={id}
+                            onClick={() => irParaAba(id)}
+                            className={`group flex items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left text-sm font-bold transition-all ${
                               ativa
-                                ? "bg-[#2D3277] text-[#FFE600]"
-                                : "bg-white text-[#1F5FD4] group-hover:bg-[#FFFBE0]"
+                                ? // Amarelo com texto azul-marinho: o par de cores
+                                  // do Mercado Livre, e destaca mais que o azul
+                                  // cheio, que competia com os botões de ação.
+                                  "border-[#FFE600] bg-[#FFE600] text-[#2D3277] shadow-md"
+                                : "border-transparent bg-zinc-50 text-zinc-700 hover:border-[#FFE600] hover:bg-white hover:text-[#1F5FD4]"
                             }`}
                           >
-                            <Icon className="h-4 w-4" />
-                          </span>
-                          <span className="truncate">{label}</span>
-                          {/* Marca discreta na aba aberta: o amarelo sozinho já
-                              destaca, e um ponto fecha a leitura sem poluir. */}
-                          {ativa && (
-                            <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-[#2D3277]" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                            <span
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                                ativa
+                                  ? "bg-[#2D3277] text-[#FFE600]"
+                                  : "bg-white text-[#1F5FD4] group-hover:bg-[#FFFBE0]"
+                              }`}
+                            >
+                              <Icon className="h-4 w-4" />
+                            </span>
+                            <span className="truncate">{label}</span>
+                            {ativa && (
+                              <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-[#2D3277]" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </nav>
 
           <div className="mt-4 space-y-4 pb-12">
-            {tab === "dashboard" && <DashboardTab onOpenAccount={(id) => { setAccountId(id); setTab("contas"); }} />}
+            {tab === "dashboard" && (
+              <DashboardTab
+                onOpenAccount={(id) => {
+                  setAccountId(id);
+                  // `irParaAba` em vez de `setTab`: abre o grupo "Visão geral"
+                  // junto, senão a navegação apontaria para um grupo fechado.
+                  irParaAba("contas");
+                }}
+              />
+            )}
             {tab === "contas" && <ContasTab accountId={accountId} onSelect={setAccountId} />}
             {tab === "aovivo" && <AoVivoTab />}
             {tab === "clientes" && <ClientesTab />}
