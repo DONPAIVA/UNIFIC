@@ -38,6 +38,20 @@ function limpar(entrada: Record<string, unknown>): Record<string, unknown> {
   for (const c of COLUNAS) {
     if (c in entrada) saida[c] = entrada[c];
   }
+
+  /*
+   * Tira espaços das pontas do código e do CPF.
+   *
+   * Um espaço invisível no começo já custou caro aqui: o pedido 77638BR foi
+   * salvo como " 77638BR" e simplesmente não era encontrado — nem pelo código
+   * nem por busca nenhuma. O mesmo aconteceu antes com um CPF.
+   *
+   * Colar de planilha ou de mensagem traz esse espaço junto, e ninguém vê.
+   */
+  for (const campo of ["tracking_code", "cpf"] as const) {
+    if (typeof saida[campo] === "string") saida[campo] = (saida[campo] as string).trim();
+  }
+
   return saida;
 }
 

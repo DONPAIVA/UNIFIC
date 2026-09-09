@@ -44,7 +44,30 @@ export async function findPedido(code: string, marketplace?: string) {
    * mais não deveria custar um pedido não encontrado.
    */
   const semPontuacao = limpo.replace(/[.\s]/g, "");
-  if (semPontuacao && semPontuacao !== limpo) return buscar(semPontuacao);
+  if (semPontuacao && semPontuacao !== limpo) {
+    const achado = await buscar(semPontuacao);
+    if (achado) return achado;
+  }
+
+  /*
+   * Última tentativa: o código GRAVADO é que tem sujeira.
+   *
+   * As duas tentativas acima limpam o que foi DIGITADO. Não resolvem quando o
+   * espaço está no banco — o pedido 77638BR estava salvo como " 77638BR", com
+   * espaço na frente, e não era encontrado de jeito nenhum.
+   *
+   * Procurar o código em qualquer posição do campo alcança esses casos. Fica
+   * por último e só com 4 caracteres ou mais: um termo curto casaria com
+   * pedido demais e traria o errado.
+   */
+  if (semPontuacao.length >= 4) {
+    const comFolga = `%${semPontuacao.replace(/([\\%_])/g, "\\$1")}%`;
+    let q = db("pedidos").select("*").ilike("tracking_code", comFolga).limit(1);
+    if (marketplace) q = q.eq("marketplace", marketplace);
+    const { data, error } = await q;
+    if (error) throw error;
+    return ((data ?? []) as Pedido[])[0] ?? null;
+  }
 
   return null;
 }
