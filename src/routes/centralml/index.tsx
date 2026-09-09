@@ -873,34 +873,62 @@ function CentralML() {
         <div className="mx-auto max-w-[1400px] px-4 py-5">
           <AccountSelector accountId={accountId} onChange={setAccountId} />
 
-          {/* Navegação agrupada: em vez de 15 botões em fila, quatro blocos
-              com rótulo. Fica claro onde cada função mora. */}
-          <nav className="mt-4 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.18)]">
-            <div className="h-1 w-full bg-[#FFE600]" />
-            <div className="space-y-2 p-3">
+          {/*
+            Navegação em quatro blocos, cada um numa coluna própria.
+
+            Antes era uma fileira por grupo, com um rótulo estreito à esquerda e
+            os botões espremidos à direita — sobrava branco no fim de cada linha
+            e os grupos não tinham peso visual nenhum. Em colunas, cada família
+            ocupa a sua faixa inteira e os botões respiram.
+
+            A grade acompanha a tela: uma coluna no celular, duas no tablet e as
+            quatro lado a lado no computador.
+          */}
+          <nav className="mt-4 overflow-hidden rounded-2xl border-2 border-zinc-200 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.22)]">
+            <div className="h-1.5 w-full bg-[#FFE600]" />
+            <div className="grid gap-px bg-zinc-200 sm:grid-cols-2 xl:grid-cols-4">
               {GRUPOS.map((grupo) => (
-                <div key={grupo} className="flex flex-wrap items-center gap-2">
-                  <span className="flex w-[110px] shrink-0 items-center gap-2 text-[10px] font-black uppercase tracking-wider text-zinc-700">
-                    <span className="h-3 w-1 rounded-full bg-[#FFE600]" />
+                <div key={grupo} className="flex flex-col bg-white p-4">
+                  <span className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-[#1F5FD4]">
+                    <span className="h-4 w-1.5 rounded-full bg-[#FFE600]" />
                     {grupo}
                   </span>
-                  {TABS.filter((t) => t.grupo === grupo).map(({ id, label, icon: Icon }) => (
-                    <button
-                      key={id}
-                      onClick={() => setTab(id)}
-                      className={`flex items-center gap-1.5 rounded-lg border-2 px-3 py-2 text-xs font-bold transition ${
-                        tab === id
-                          ? // Aba ativa em amarelo com texto azul-marinho: é o par
-                            // de cores do Mercado Livre e destaca mais que o azul
-                            // cheio, que competia com os botões de ação.
-                            "border-[#FFE600] bg-[#FFE600] text-[#2D3277] shadow-sm"
-                          : "border-zinc-200 bg-white text-zinc-600 hover:border-[#FFE600] hover:text-[#1F5FD4]"
-                      }`}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {label}
-                    </button>
-                  ))}
+
+                  <div className="flex flex-col gap-1.5">
+                    {TABS.filter((t) => t.grupo === grupo).map(({ id, label, icon: Icon }) => {
+                      const ativa = tab === id;
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => setTab(id)}
+                          className={`group flex w-full items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left text-sm font-bold transition-all ${
+                            ativa
+                              ? // Amarelo com texto azul-marinho: o par de cores do
+                                // Mercado Livre, e destaca mais que o azul cheio,
+                                // que competia com os botões de ação.
+                                "border-[#FFE600] bg-[#FFE600] text-[#2D3277] shadow-md"
+                              : "border-transparent bg-zinc-50 text-zinc-700 hover:border-[#FFE600] hover:bg-white hover:text-[#1F5FD4]"
+                          }`}
+                        >
+                          <span
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                              ativa
+                                ? "bg-[#2D3277] text-[#FFE600]"
+                                : "bg-white text-[#1F5FD4] group-hover:bg-[#FFFBE0]"
+                            }`}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </span>
+                          <span className="truncate">{label}</span>
+                          {/* Marca discreta na aba aberta: o amarelo sozinho já
+                              destaca, e um ponto fecha a leitura sem poluir. */}
+                          {ativa && (
+                            <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-[#2D3277]" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               ))}
             </div>
