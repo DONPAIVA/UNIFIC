@@ -333,20 +333,31 @@ export function progressOf(p: Pedido, now = Date.now()) {
   const manual = manualProgress(p);
   if (manual !== null) return manual;
 
+  /*
+   * A mesma régua do histórico.
+   *
+   * Sem isto, o pedido pausado tinha o caminhão sem balançar mas ainda
+   * DESLIZANDO pelo mapa, porque a posição vinha do relógio. Parado de
+   * verdade é parado nas duas coisas.
+   */
+  const regua = reguaDoTempo(p, now);
+
   const start = shipDateTime(p).getTime();
   const end = expectedDate(p).getTime();
-  if (now <= start) return 0;
-  if (now >= end || isDelivered(p)) return 100;
+  if (regua <= start) return 0;
+  if (regua >= end || isDelivered(p)) return 100;
   const totalActive = activeMsBetween(start, end);
   if (totalActive <= 0) return 0;
-  return Math.min(99.9, (activeMsBetween(start, now) / totalActive) * 100);
+  return Math.min(99.9, (activeMsBetween(start, regua) / totalActive) * 100);
 }
 
 /** Tempo restante estimado até a entrega, em texto dinâmico */
 export function etaText(p: Pedido, now = Date.now()) {
   if (isDelivered(p)) return "Entrega concluída";
   const end = expectedDate(p).getTime();
-  const diff = end - now;
+  // Pausado também para a contagem: um tempo restante caindo ao lado de um
+  // caminhão imóvel e de um histórico congelado entregaria a incoerência.
+  const diff = end - reguaDoTempo(p, now);
   if (diff <= 0) return "Chegando hoje";
   const dias = Math.floor(diff / 86400000);
   const horas = Math.floor((diff % 86400000) / 3600000);
@@ -439,10 +450,31 @@ export function eventosDoPedido(p: Pedido): { at: Date; title: string; place: st
   });
 }
 
+/**
+ * Momento que serve de régua para dizer o que já aconteceu.
+ *
+ * Normalmente é agora. Com o pedido PAUSADO, é o instante em que ele foi
+ * pausado — a última gravação.
+ *
+ * Sem isso a pausa congelava só o caminhão do mapa: a lista de eventos
+ * continuava andando, e o cliente via o objeto parado num ponto enquanto o
+ * histórico anunciava cidades novas. Duas versões da mesma viagem.
+ *
+ * Data de gravação ilegível cai em "agora": esconder o histórico inteiro por
+ * causa de um campo estranho seria pior do que o desalinhamento.
+ */
+export function reguaDoTempo(p: Pedido, now: number = Date.now()): number {
+  if (!p.pausado || !p.updated_at) return now;
+  const congelado = new Date(p.updated_at).getTime();
+  return Number.isNaN(congelado) ? now : congelado;
+}
+
 /** Histórico de movimentação dinâmico: só mostra eventos cuja data/hora já passou */
 export function buildMovimentos(p: Pedido, now = Date.now()): Movimento[] {
+  const regua = reguaDoTempo(p, now);
+
   const list = eventosDoPedido(p)
-    .map((r) => ({ ...r, done: r.at.getTime() <= now }))
+    .map((r) => ({ ...r, done: r.at.getTime() <= regua }))
     .filter((r) => r.done || isDelivered(p));
 
   /*

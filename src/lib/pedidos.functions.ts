@@ -55,6 +55,55 @@ function limpar(entrada: Record<string, unknown>): Record<string, unknown> {
   return saida;
 }
 
+/**
+ * Guarda a data dos eventos que o cliente já viu, para eles não se moverem.
+ *
+ * Lê o pedido como ele está AGORA — antes da edição entrar — e grava a data de
+ * cada evento que já apareceu. Da próxima vez que o histórico for montado,
+ * esses eventos usam a data gravada em vez de recalcular.
+ *
+ * A régua de "já apareceu" é a mesma do histórico (`reguaDoTempo`), então
+ * pedido pausado congela no instante da pausa, e não em agora.
+ *
+ * Os ajustes feitos à mão no formulário vêm DEPOIS dos congelados e ganham:
+ * se você acabou de digitar uma data para um evento, é ela que vale.
+ *
+ * A data é gravada completa, com fuso. O servidor costuma rodar em UTC e o seu
+ * navegador não — guardar só "hora local" deslocaria tudo.
+ */
+async function congelarPassado(
+  id: string,
+  enviados: Record<string, unknown>,
+): Promise<Record<string, string> | null> {
+  try {
+    const { db } = await import("./server/db.server");
+    const { eventosDoPedido, reguaDoTempo } = await import("./tracking");
+
+    const { data: antes } = await db("pedidos").select("*").eq("id", id).maybeSingle();
+
+    const congelados: Record<string, string> = {};
+    if (antes) {
+      const regua = reguaDoTempo(antes as any);
+      eventosDoPedido(antes as any).forEach((e, i) => {
+        if (e.at.getTime() <= regua) congelados[String(i)] = e.at.toISOString();
+      });
+    }
+
+    const doFormulario = (enviados["eventos_ajustes"] ?? null) as Record<string, string> | null;
+    const juntos = { ...congelados, ...(doFormulario ?? {}) };
+    return Object.keys(juntos).length ? juntos : null;
+  } catch {
+    /*
+     * Falhar aqui NÃO impede a gravação.
+     *
+     * Congelar é proteção do histórico, não parte do cadastro. Entre recusar a
+     * edição do pedido e deixar o histórico exposto ao deslocamento antigo, a
+     * escolha é não travar o trabalho — devolvendo o que veio do formulário.
+     */
+    return (enviados["eventos_ajustes"] ?? null) as Record<string, string> | null;
+  }
+}
+
 /** Todos os rastreios cadastrados, do mais novo para o mais antigo. */
 export const adminListarPedidos = createServerFn({ method: "GET" })
   .middleware([requireAdminUser])
@@ -81,6 +130,19 @@ export const adminSalvarPedido = createServerFn({ method: "POST" })
     const campos = limpar(data.dados);
     const codigo = String(campos["tracking_code"] ?? "").trim();
     if (!codigo) throw new Error("O código de rastreio é obrigatório.");
+
+    /*
+     * Antes de gravar, congela o que o cliente JÁ VIU.
+     *
+     * O histórico não era guardado: era recalculado das datas a cada visita.
+     * Esticar a entrega prevista esticava a linha do tempo inteira, e eventos
+     * já lidos voltavam para o futuro e desapareciam — o rastreio parecia
+     * andar para trás. Foi o que aconteceu com o pedido do Albanir: ele viu
+     * Itajaí e, depois de uma edição de prazo, passou a ver Colombo.
+     *
+     * Congelando, mexer no prazo só move o que ainda não aconteceu.
+     */
+    if (data.id) campos["eventos_ajustes"] = await congelarPassado(data.id, data.dados);
 
     const { error } = data.id
       ? await db("pedidos").update(campos).eq("id", data.id)

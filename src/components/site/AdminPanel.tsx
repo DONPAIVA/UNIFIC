@@ -256,7 +256,11 @@ function EventosDoHistorico({
             <li key={i} className="flex flex-wrap items-center gap-2 text-xs">
               <input
                 type="datetime-local"
-                value={ajustes[String(i)] ?? paraCampo(e.at)}
+                /* `e.at` já vem com o ajuste aplicado, então basta formatá-lo.
+                   Usar o valor guardado direto quebraria o campo: o
+                   congelamento automático grava a data completa, com fuso, e
+                   um `datetime-local` só aceita "AAAA-MM-DDTHH:MM". */
+                value={paraCampo(e.at)}
                 onChange={(ev) => definir(i, ev.target.value)}
                 className={`w-[190px] rounded-md border bg-white px-2 py-1 ${
                   ajustado ? "border-primary font-semibold" : "border-input"
