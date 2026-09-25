@@ -312,6 +312,7 @@ function EntrarNoPainel({ onEntrou }: { onEntrou: () => void }) {
           email: email.trim(),
           sucesso: !error,
           motivo: error ? "senha_errada" : "ok",
+          painel: "rastreios",
         },
       }).catch(() => {});
 
@@ -374,7 +375,7 @@ function CodigoDoPainel({ onOk, onSair }: { onOk: () => void; onSair: () => void
     void (async () => {
       const { registrarTentativaPainel } = await import("@/lib/monitor.functions");
       void registrarTentativaPainel({
-        data: { email: "", sucesso: false, motivo: "2fa_pedido" },
+        data: { email: "", sucesso: false, motivo: "2fa_pedido", painel: "rastreios" },
       }).catch(() => {});
     })();
   }, []);
@@ -389,7 +390,7 @@ function CodigoDoPainel({ onOk, onSair }: { onOk: () => void; onSair: () => void
     setErro(null);
     try {
       const { conferirSegundoFator } = await import("@/lib/dois-fatores.functions");
-      await conferirSegundoFator({ data: { codigo } });
+      await conferirSegundoFator({ data: { codigo, painel: "rastreios" } });
       onOk();
     } catch (e2) {
       setBusy(false);

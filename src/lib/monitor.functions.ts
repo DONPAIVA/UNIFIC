@@ -94,32 +94,27 @@ export const registrarPresenca = createServerFn({ method: "POST" })
  * Não recebe e nunca grava a senha.
  */
 export const registrarTentativaPainel = createServerFn({ method: "POST" })
-  .inputValidator((input: { email: string; sucesso: boolean; motivo?: string }) => ({
-    email: String(input?.email ?? "").toLowerCase().trim().slice(0, 150),
-    sucesso: Boolean(input?.sucesso),
-    motivo: String(input?.motivo ?? "").slice(0, 60),
-  }))
+  .inputValidator(
+    (input: { email: string; sucesso: boolean; motivo?: string; painel?: string }) => ({
+      email: String(input?.email ?? "").toLowerCase().trim().slice(0, 150),
+      sucesso: Boolean(input?.sucesso),
+      motivo: String(input?.motivo ?? "").slice(0, 60),
+      // Só dois valores aceitos: qualquer outra coisa vira nulo, para o
+      // navegador não conseguir escrever texto livre nessa coluna.
+      painel: input?.painel === "olho_de_deus" || input?.painel === "rastreios" ? input.painel : null,
+    }),
+  )
   .handler(async ({ data }) => {
     // Registrar a tentativa NUNCA pode impedir alguém de entrar. Quem tem a
     // credencial certa passa mesmo que o registro falhe.
-    try {
-      const { getRequest } = await import("@tanstack/react-start/server");
-      const { db } = await import("./server/db.server");
-      const { ipDeHeaders } = await import("./server/ip.server");
-
-      const request = getRequest();
-      await db("tentativas_painel").insert({
-        email: data.email || null,
-        ip: ipDeHeaders(request.headers),
-        navegador: (request.headers.get("user-agent") ?? "").slice(0, 300),
-        sucesso: data.sucesso,
-        motivo: data.motivo || (data.sucesso ? "ok" : "senha_errada"),
-      });
-
-      return { ok: true };
-    } catch {
-      return { ok: false };
-    }
+    const { gravarTentativa } = await import("./server/tentativas.server");
+    const ok = await gravarTentativa({
+      email: data.email,
+      sucesso: data.sucesso,
+      motivo: data.motivo || (data.sucesso ? "ok" : "senha_errada"),
+      painel: data.painel as "olho_de_deus" | "rastreios" | null,
+    });
+    return { ok };
   });
 
 /* -------------------------------------------------------------------------- */
@@ -288,7 +283,10 @@ export const adminAoVivo = createServerFn({ method: "GET" })
 
     const tentativas = await admin
       .from("tentativas_painel")
-      .select("id, email, ip, navegador, sucesso, motivo, criado_em")
+      // `*` e não a lista de colunas: pedir `painel` por nome antes de a
+      // migração rodar faria a consulta falhar, e a lista de tentativas
+      // inteira sumiria da tela. Com `*`, a coluna vem quando existir.
+      .select("*")
       .order("criado_em", { ascending: false })
       .limit(60)
       .then((r: any) => r.data ?? [])
@@ -341,6 +339,8 @@ export const adminAoVivo = createServerFn({ method: "GET" })
         sucesso: t.sucesso,
         motivo: t.motivo,
         quando: t.criado_em,
+        // Nulo nos registros antigos, de antes da coluna existir.
+        painel: (t.painel as string | null | undefined) ?? null,
       })),
       alertas,
     };

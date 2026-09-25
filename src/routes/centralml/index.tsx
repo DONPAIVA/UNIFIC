@@ -392,7 +392,7 @@ function TelaDoCodigo({ onOk, onSair }: { onOk: () => void; onSair: () => void }
    */
   useEffect(() => {
     void registrarTentativaPainel({
-      data: { email: "", sucesso: false, motivo: "2fa_pedido" },
+      data: { email: "", sucesso: false, motivo: "2fa_pedido", painel: "olho_de_deus" },
     }).catch(() => {});
   }, []);
 
@@ -406,7 +406,7 @@ function TelaDoCodigo({ onOk, onSair }: { onOk: () => void; onSair: () => void }
     setErro(null);
     try {
       const { conferirSegundoFator } = await import("@/lib/dois-fatores.functions");
-      await conferirSegundoFator({ data: { codigo } });
+      await conferirSegundoFator({ data: { codigo, painel: "olho_de_deus" } });
       onOk();
     } catch (e2) {
       setBusy(false);
@@ -498,7 +498,12 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
      * quem tem a credencial certa.
      */
     void registrarTentativaPainel({
-      data: { email: alvo, sucesso: !authError, motivo: authError ? "senha_errada" : "ok" },
+      data: {
+        email: alvo,
+        sucesso: !authError,
+        motivo: authError ? "senha_errada" : "ok",
+        painel: "olho_de_deus",
+      },
     }).catch(() => {});
 
     if (authError) {
@@ -2346,10 +2351,26 @@ function AoVivoTab() {
         ) : data.tentativas.length === 0 ? (
           <Empty>Nenhuma tentativa registrada ainda.</Empty>
         ) : (
-          <Table head={["Quando", "E-mail", "Resultado", "IP", "Navegador", "Ação"]}>
+          <Table head={["Quando", "Painel", "E-mail", "Resultado", "IP", "Navegador", "Ação"]}>
             {data.tentativas.map((t: any) => (
               <tr key={t.id} className={`border-t border-zinc-100 ${t.sucesso ? "" : "bg-red-50/60"}`}>
                 <td className="px-2 py-2 text-xs">{fmtDateTime(t.quando)}</td>
+                <td className="px-2 py-2 text-xs">
+                  {t.painel === "olho_de_deus" ? (
+                    <span className="whitespace-nowrap rounded bg-[#2D3277] px-1.5 py-0.5 text-[10px] font-black text-[#FFE600]">
+                      OLHO DE DEUS
+                    </span>
+                  ) : t.painel === "rastreios" ? (
+                    <span className="whitespace-nowrap rounded bg-[#FFE600] px-1.5 py-0.5 text-[10px] font-black text-[#2D3277]">
+                      RASTREIOS
+                    </span>
+                  ) : (
+                    // Registros de antes da separação: não dá para saber.
+                    <span className="text-zinc-500" title="Registrado antes de o sistema separar os painéis.">
+                      —
+                    </span>
+                  )}
+                </td>
                 <td className="px-2 py-2 text-xs">{t.email || "—"}</td>
                 <td className="px-2 py-2 text-xs">
                   <ResultadoDaTentativa sucesso={t.sucesso} motivo={t.motivo} />
@@ -4246,7 +4267,8 @@ function SegundoFatorPainel() {
     setMsg(null);
     try {
       const { conferirSegundoFator } = await import("@/lib/dois-fatores.functions");
-      await conferirSegundoFator({ data: { codigo } });
+      // A ativação acontece em Configurações, dentro da Olho de Deus.
+      await conferirSegundoFator({ data: { codigo, painel: "olho_de_deus" } });
       setSegredo(null);
       setEndereco(null);
       setCodigo("");
