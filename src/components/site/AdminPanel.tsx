@@ -287,6 +287,84 @@ function EventosDoHistorico({
   );
 }
 
+/**
+ * Liga/desliga do RASTREIO LIVRE.
+ *
+ * Ligado: qualquer pessoa que digita um código no site rastreia direto, sem
+ * ser mandada para autorizar o Mercado Livre. Desligado: a regra de sempre.
+ *
+ * Fica no topo, fora das abas, porque muda o que TODO visitante vê — não é
+ * uma configuração para ficar escondida.
+ */
+function ChaveRastreioLivre() {
+  const qc = useQueryClient();
+  const [erro, setErro] = useState<string | null>(null);
+
+  const estado = useQuery({
+    queryKey: ["rastreio-livre"],
+    queryFn: async () => {
+      const { rastreioLivre } = await import("@/lib/configuracoes.functions");
+      return (await rastreioLivre()).livre;
+    },
+  });
+
+  const mudar = useMutation({
+    mutationFn: async (livre: boolean) => {
+      const { adminDefinirRastreioLivre } = await import("@/lib/configuracoes.functions");
+      return (await adminDefinirRastreioLivre({ data: { livre } })).livre;
+    },
+    onMutate: () => setErro(null),
+    onSuccess: (livre) => {
+      qc.setQueryData(["rastreio-livre"], livre);
+      toast.success(livre ? "Rastreio livre LIGADO" : "Rastreio livre desligado");
+    },
+    onError: (e: Error) => setErro(e.message),
+  });
+
+  const ligado = estado.data === true;
+  const ocupado = estado.isLoading || mudar.isPending;
+
+  return (
+    <div
+      className={`mb-4 flex flex-wrap items-center gap-3 rounded-lg border-2 p-3 transition-colors ${
+        ligado ? "border-emerald-500 bg-emerald-50" : "border-border bg-muted/40"
+      }`}
+    >
+      <button
+        type="button"
+        role="switch"
+        aria-checked={ligado}
+        disabled={ocupado}
+        onClick={() => mudar.mutate(!ligado)}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
+          ligado ? "bg-emerald-500" : "bg-zinc-400"
+        }`}
+      >
+        <span
+          className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
+            ligado ? "left-6" : "left-1"
+          }`}
+        />
+      </button>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold text-card-foreground">
+          Rastreio livre{" "}
+          <span className={ligado ? "text-emerald-700" : "text-muted-foreground"}>
+            · {estado.isLoading ? "verificando..." : ligado ? "LIGADO" : "desligado"}
+          </span>
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {ligado
+            ? "Qualquer pessoa que digitar o código rastreia direto, sem autorizar o Mercado Livre."
+            : "Para rastrear, a pessoa precisa autorizar o app na conta do Mercado Livre."}
+        </p>
+        {erro && <p className="mt-1 text-xs font-bold text-destructive">{erro}</p>}
+      </div>
+    </div>
+  );
+}
+
 /** E-mail e senha do administrador — o mesmo acesso da Olho de Deus ML. */
 function EntrarNoPainel({ onEntrou }: { onEntrou: () => void }) {
   const [email, setEmail] = useState("");
@@ -538,6 +616,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <Shell onClose={onClose} title="Painel Únific+ — Administração">
+      <ChaveRastreioLivre />
+
       <div className="mb-4 flex flex-wrap gap-2">
         {([
           ["pedidos", "Pedidos / Rastreios"],

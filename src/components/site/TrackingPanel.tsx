@@ -71,11 +71,28 @@ export function TrackingPanel() {
     enabled: autenticado,
   });
 
+  /*
+   * RASTREIO LIVRE — o botão do painel que solta a trava acima.
+   *
+   * Ligado lá, qualquer pessoa rastreia direto, sem passar pelo Mercado Livre.
+   * A pergunta vai ao servidor, que responde só sim/não; qualquer falha vira
+   * "não", mantendo a regra de sempre.
+   */
+  const livre = useQuery({
+    queryKey: ["rastreio-livre"],
+    queryFn: async () => {
+      const { rastreioLivre } = await import("@/lib/configuracoes.functions");
+      return (await rastreioLivre()).livre;
+    },
+    staleTime: 30_000,
+  });
+
   const conectado = Boolean(conexao.data?.conectado);
-  const liberado = conectado;
-  // Enquanto a consulta não responde não se sabe se há conexão — e mandar para
-  // o Mercado Livre nessa dúvida tiraria da tela quem já estava conectado.
-  const verificandoConexao = autenticado && conexao.isLoading;
+  const liberado = livre.data === true || conectado;
+  // Enquanto as consultas não respondem não se sabe se o rastreio está livre
+  // nem se há conexão — mandar para o Mercado Livre nessa dúvida tiraria da
+  // tela quem não precisava ir.
+  const verificandoConexao = livre.isLoading || (autenticado && conexao.isLoading);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-mp", mp);
@@ -273,7 +290,7 @@ export function TrackingPanel() {
      * criou conta e nunca autorizou o app: os dois vão para a autorização.
      */
     if (verificandoConexao) {
-      toast.info("Verificando sua conexão com o Mercado Livre...");
+      toast.info("Um instante, preparando o rastreio...");
       return;
     }
 
