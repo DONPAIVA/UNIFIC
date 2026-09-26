@@ -853,7 +853,17 @@ function PedidosAdmin() {
                             pausado: Boolean(p.pausado),
                             hora_coleta: p.hora_coleta ?? "",
                             eventos_ajustes: p.eventos_ajustes ?? {},
-                            delivery_date: p.delivery_date ?? "",
+                            /*
+                             * Só os 10 primeiros caracteres das datas.
+                             *
+                             * O banco devolve a entrega prevista no formato
+                             * longo ("2026-10-30T00:00:00+00:00"), e o campo de
+                             * data do formulário só aceita "2026-10-30". Com o
+                             * formato longo o campo aparecia VAZIO ao reabrir o
+                             * pedido — a data estava salva, mas parecia que não.
+                             */
+                            delivery_date: p.delivery_date ? String(p.delivery_date).slice(0, 10) : "",
+                            ship_date: p.ship_date ? String(p.ship_date).slice(0, 10) : empty.ship_date,
                             product_value: p.product_value ?? 0,
                             weight: p.weight ?? 1,
                           })
