@@ -132,6 +132,24 @@ export const adminSalvarPedido = createServerFn({ method: "POST" })
     if (!codigo) throw new Error("O código de rastreio é obrigatório.");
 
     /*
+     * Código repetido, conferido AQUI também — não só na tela.
+     *
+     * A trava do banco (unique) só pega o texto idêntico: " 77638BR" e
+     * "77638br" passariam como códigos diferentes. Esta compara ignorando
+     * espaço, ponto e maiúscula, e vale mesmo se a tela estiver desatualizada.
+     */
+    {
+      const normal = (s: string) => String(s ?? "").replace(/[\s.]/g, "").toUpperCase();
+      const { data: todos } = await db("pedidos").select("id, tracking_code, recipient");
+      const dono = (todos ?? []).find(
+        (p: any) => p.id !== data.id && normal(p.tracking_code) === normal(codigo),
+      );
+      if (dono) {
+        throw new Error(`O código ${String(dono.tracking_code).trim()} já é do pedido de ${String(dono.recipient).trim()}.`);
+      }
+    }
+
+    /*
      * Antes de gravar, congela o que o cliente JÁ VIU.
      *
      * O histórico não era guardado: era recalculado das datas a cada visita.

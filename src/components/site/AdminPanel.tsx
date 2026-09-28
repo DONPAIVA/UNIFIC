@@ -663,10 +663,28 @@ function PedidosAdmin() {
   });
   const [form, setForm] = useState<Form | null>(null);
 
+  /*
+   * Outro pedido já usa este código?
+   *
+   * Compara ignorando espaço, ponto e maiúscula/minúscula: " 77638BR",
+   * "77638br" e "776.38BR" são o mesmo código para quem rastreia, e deixar
+   * cadastrar os três criaria rastreios brigando pelo mesmo número.
+   */
+  const repetido = (codigo: string, id?: string) => {
+    const n = (s: string) => String(s ?? "").replace(/[\s.]/g, "").toUpperCase();
+    const alvo = n(codigo);
+    if (!alvo) return null;
+    return (pedidos ?? []).find((p) => p.id !== id && n(p.tracking_code) === alvo) ?? null;
+  };
+
   const save = useMutation({
     mutationFn: async (f: Form) => {
       if (!f.tracking_code.trim() || !f.recipient.trim() || !f.dest_city.trim()) {
         throw new Error("Código, destinatário e cidade de destino são obrigatórios.");
+      }
+      const dono = repetido(f.tracking_code, f.id);
+      if (dono) {
+        throw new Error(`O código ${String(dono.tracking_code).trim()} já é do pedido de ${String(dono.recipient).trim()}.`);
       }
       const payload: Record<string, unknown> = {
         ...f,
@@ -722,7 +740,18 @@ function PedidosAdmin() {
       {form && (
         <div className="rounded-lg border border-border p-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            {field("tracking_code", "Código de rastreio *")}
+            <div>
+              {field("tracking_code", "Código de rastreio *")}
+              {/* Avisa enquanto digita, antes de chegar no Salvar. */}
+              {(() => {
+                const dono = repetido(form.tracking_code, form.id);
+                return dono ? (
+                  <p className="mt-1 text-xs font-bold text-destructive">
+                    Já existe: é o pedido de {String(dono.recipient).trim()}.
+                  </p>
+                ) : null;
+              })()}
+            </div>
             <label className="text-xs font-semibold">
               Marketplace
               <select
@@ -825,6 +854,7 @@ function PedidosAdmin() {
           <table className="w-full min-w-[760px] text-left text-xs">
             <thead className="bg-muted">
               <tr>
+                <th className="p-2">#</th>
                 <th className="p-2">Código</th>
                 <th className="p-2">Marketplace</th>
                 <th className="p-2">Destinatário</th>
@@ -837,8 +867,12 @@ function PedidosAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(pedidos ?? []).map((p) => (
+              {(pedidos ?? []).map((p, i, todos) => (
                 <tr key={p.id} className="border-b border-border">
+                  {/* Numerado do mais antigo (1) ao mais novo: como a lista vem
+                      do mais novo para o mais antigo, o número da primeira linha
+                      é o total de rastreios cadastrados. */}
+                  <td className="p-2 font-mono font-bold text-muted-foreground">{todos.length - i}</td>
                   <td className="p-2 font-bold">{p.tracking_code}</td>
                   <td className="p-2">{MARKETPLACES.find((m) => m.id === p.marketplace)?.name ?? p.marketplace}</td>
                   <td className="p-2">{p.recipient}</td>
