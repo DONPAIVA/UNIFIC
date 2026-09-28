@@ -764,7 +764,18 @@ function PedidosAdmin() {
                         dest_cep: info.cep,
                         dest_city: info.city || f.dest_city,
                         dest_state: info.state || f.dest_state,
-                        dest_address: [info.street, info.district].filter(Boolean).join(" - ") || f.dest_address,
+                        /*
+                         * O CEP só PREENCHE o endereço quando ele está vazio.
+                         *
+                         * Antes ele substituía sempre por "Rua - Bairro" — e a
+                         * consulta roda de novo toda vez que um pedido é aberto
+                         * em Editar, porque o CEP já vem preenchido. Resultado:
+                         * o número e o complemento digitados sumiam a cada
+                         * edição. O que você escreveu à mão sempre ganha.
+                         */
+                        dest_address: String(f.dest_address ?? "").trim()
+                          ? f.dest_address
+                          : [info.street, info.district].filter(Boolean).join(" - "),
                       }
                     : f,
                 )
