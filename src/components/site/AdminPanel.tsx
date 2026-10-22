@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Check, Loader2, MapPin, Plus, Save, Trash2, X } from "lucide-react";
 import { ERRO_2FA } from "@/lib/auth-middleware";
 import {
+  adminDefinirAutorizacaoMl,
   adminExcluirPedido,
   adminListarPedidos,
   adminListarTabela,
@@ -11,7 +12,16 @@ import {
 } from "@/lib/pedidos.functions";
 import { lookupCep, maskCep, onlyDigits, type CepInfo } from "@/lib/cep";
 import { MARKETPLACES } from "@/lib/marketplaces";
-import { eventosDoPedido, fmtDate, money, progressOf, statusFor, type Pedido } from "@/lib/tracking";
+import {
+  eventosDoPedido,
+  fmtDate,
+  money,
+  pedeAutorizacaoMl,
+  progressOf,
+  statusFor,
+  type ModoAutorizacaoMl,
+  type Pedido,
+} from "@/lib/tracking";
 
 function CepField({
   value,
@@ -357,11 +367,64 @@ function ChaveRastreioLivre() {
         <p className="text-xs text-muted-foreground">
           {ligado
             ? "Qualquer pessoa que digitar o código rastreia direto, sem autorizar o Mercado Livre."
-            : "Para rastrear, a pessoa precisa autorizar o app na conta do Mercado Livre."}
+            : "Para rastrear, a pessoa precisa autorizar o app na conta do Mercado Livre."}{" "}
+          Pedidos com escolha própria na coluna "Autorização ML" não seguem este botão.
         </p>
         {erro && <p className="mt-1 text-xs font-bold text-destructive">{erro}</p>}
       </div>
     </div>
+  );
+}
+
+/** O botão geral do rastreio livre, lido do mesmo cache do liga/desliga. */
+function useRastreioLivreGeral(): boolean {
+  const estado = useQuery({
+    queryKey: ["rastreio-livre"],
+    queryFn: async () => {
+      const { rastreioLivre } = await import("@/lib/configuracoes.functions");
+      return (await rastreioLivre()).livre;
+    },
+  });
+  return estado.data === true;
+}
+
+/**
+ * Escolha, por pedido, de quem vai autorizar o Mercado Livre ao rastrear.
+ *
+ * "Geral" mostra entre parênteses o que o botão de cima está fazendo agora,
+ * para não precisar adivinhar o que vai acontecer com aquele cliente.
+ */
+function SeletorAutorizacaoMl({
+  valor,
+  livreGeral,
+  onChange,
+  disabled,
+  className = "",
+}: {
+  valor: ModoAutorizacaoMl | null | undefined;
+  livreGeral: boolean;
+  onChange: (modo: ModoAutorizacaoMl | null) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const pede = pedeAutorizacaoMl({ autorizacao_ml: valor ?? null }, livreGeral);
+  const cor = !valor
+    ? "border-input bg-white"
+    : pede
+      ? "border-amber-400 bg-amber-50 text-amber-900"
+      : "border-emerald-400 bg-emerald-50 text-emerald-900";
+
+  return (
+    <select
+      value={valor ?? ""}
+      disabled={disabled}
+      onChange={(e) => onChange((e.target.value || null) as ModoAutorizacaoMl | null)}
+      className={`rounded-md border px-2 py-1 text-xs font-semibold disabled:opacity-60 ${cor} ${className}`}
+    >
+      <option value="">Geral ({livreGeral ? "livre" : "pede ML"})</option>
+      <option value="exigir">Pede autorização ML</option>
+      <option value="livre">Livre (não pede)</option>
+    </select>
   );
 }
 
@@ -545,6 +608,8 @@ const empty = {
   hora_coleta: "",
   // Só os eventos ajustados à mão. Vazio = todos calculados.
   eventos_ajustes: {} as Record<string, string>,
+  // Nulo = segue o botão "Rastreio livre".
+  autorizacao_ml: null as ModoAutorizacaoMl | null,
 };
 
 type Form = typeof empty & { id?: string };
@@ -662,6 +727,40 @@ function PedidosAdmin() {
     queryFn: async () => (await adminListarPedidos()).pedidos as Pedido[],
   });
   const [form, setForm] = useState<Form | null>(null);
+  const livreGeral = useRastreioLivreGeral();
+
+  /*
+   * Troca rápida, direto na lista, de quem vai autorizar o Mercado Livre.
+   *
+   * Atualiza a linha na tela na hora e desfaz se o servidor recusar — é um
+   * clique que se faz em vários clientes seguidos, não dá para esperar a lista
+   * inteira recarregar a cada um.
+   */
+  const trocarAutorizacao = useMutation({
+    mutationFn: (v: { id: string; modo: ModoAutorizacaoMl | null }) => adminDefinirAutorizacaoMl({ data: v }),
+    onMutate: ({ id, modo }) => {
+      const antes = qc.getQueryData<Pedido[]>(["pedidos-admin"]);
+      qc.setQueryData<Pedido[]>(["pedidos-admin"], (lista) =>
+        (lista ?? []).map((p) => (p.id === id ? { ...p, autorizacao_ml: modo } : p)),
+      );
+      return { antes };
+    },
+    onSuccess: (_r, { modo }) => {
+      toast.success(
+        modo === "exigir"
+          ? "Este cliente vai autorizar o Mercado Livre ao rastrear."
+          : modo === "livre"
+            ? "Este cliente rastreia direto, sem o Mercado Livre."
+            : "Este cliente volta a seguir o botão geral.",
+      );
+    },
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.antes) qc.setQueryData(["pedidos-admin"], ctx.antes);
+      toast.error(e.message);
+    },
+  });
+
+  const quantosPedem = (pedidos ?? []).filter((p) => pedeAutorizacaoMl(p, livreGeral)).length;
 
   /*
    * Outro pedido já usa este código?
@@ -705,6 +804,7 @@ function PedidosAdmin() {
       toast.success("Pedido salvo e sincronizado com o site!");
       setForm(null);
       void qc.invalidateQueries({ queryKey: ["pedidos"] });
+      void qc.invalidateQueries({ queryKey: ["pedidos-admin"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -820,6 +920,15 @@ function PedidosAdmin() {
             {field("product", "Produto")}
             {field("product_value", "Valor (R$)", "number")}
             {field("weight", "Peso (kg)", "number")}
+            <label className="text-xs font-semibold">
+              Autorização do Mercado Livre ao rastrear
+              <SeletorAutorizacaoMl
+                valor={form.autorizacao_ml}
+                livreGeral={livreGeral}
+                onChange={(modo) => setForm({ ...form, autorizacao_ml: modo })}
+                className="mt-1 block w-full py-1.5 text-sm"
+              />
+            </label>
           </div>
 
           <ControleDeProgresso
@@ -851,7 +960,14 @@ function PedidosAdmin() {
         <Loader2 className="h-5 w-5 animate-spin" />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-xs">
+          {(pedidos ?? []).length > 0 && (
+            <p className="mb-2 text-xs text-muted-foreground">
+              <strong className="text-amber-700">{quantosPedem}</strong> pedem autorização do Mercado Livre ao
+              rastrear · <strong className="text-emerald-700">{(pedidos ?? []).length - quantosPedem}</strong>{" "}
+              rastreiam direto. Escolha cliente por cliente na coluna "Autorização ML".
+            </p>
+          )}
+          <table className="w-full min-w-[900px] text-left text-xs">
             <thead className="bg-muted">
               <tr>
                 <th className="p-2">#</th>
@@ -863,6 +979,7 @@ function PedidosAdmin() {
                 <th className="p-2">Status</th>
                 <th className="p-2">Progresso</th>
                 <th className="p-2">Valor</th>
+                <th className="p-2">Autorização ML</th>
                 <th className="p-2" />
               </tr>
             </thead>
@@ -882,6 +999,14 @@ function PedidosAdmin() {
                   <td className="p-2">{progressOf(p).toFixed(0)}%</td>
                   <td className="p-2">{money(p.product_value)}</td>
                   <td className="p-2">
+                    <SeletorAutorizacaoMl
+                      valor={p.autorizacao_ml}
+                      livreGeral={livreGeral}
+                      disabled={trocarAutorizacao.isPending && trocarAutorizacao.variables?.id === p.id}
+                      onChange={(modo) => trocarAutorizacao.mutate({ id: p.id, modo })}
+                    />
+                  </td>
+                  <td className="p-2">
                     <div className="flex gap-1">
                       <button
                         onClick={() =>
@@ -898,6 +1023,7 @@ function PedidosAdmin() {
                             pausado: Boolean(p.pausado),
                             hora_coleta: p.hora_coleta ?? "",
                             eventos_ajustes: p.eventos_ajustes ?? {},
+                            autorizacao_ml: p.autorizacao_ml ?? null,
                             /*
                              * Só os 10 primeiros caracteres das datas.
                              *
@@ -926,7 +1052,7 @@ function PedidosAdmin() {
               ))}
               {(pedidos ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={9} className="p-4 text-center text-muted-foreground">Nenhum pedido cadastrado ainda.</td>
+                  <td colSpan={11} className="p-4 text-center text-muted-foreground">Nenhum pedido cadastrado ainda.</td>
                 </tr>
               )}
             </tbody>

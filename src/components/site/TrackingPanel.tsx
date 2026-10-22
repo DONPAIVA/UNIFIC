@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
@@ -17,6 +17,7 @@ import {
   fmtDate,
   fmtDateTime,
   isMoving,
+  pedeAutorizacaoMl,
   progressOf,
   statusFor,
   type Movimento,
@@ -28,6 +29,25 @@ import { NotaFiscal } from "./NotaFiscal";
 
 const RouteMap = lazy(() => import("./RouteMap"));
 
+/** O que foi digitado antes de ir autorizar o Mercado Livre, para retomar na volta. */
+const CHAVE_PENDENTE = "unific:rastreio-pendente";
+
+function lerPendente(): string | null {
+  try {
+    return sessionStorage.getItem(CHAVE_PENDENTE);
+  } catch {
+    return null;
+  }
+}
+
+function limparPendente() {
+  try {
+    sessionStorage.removeItem(CHAVE_PENDENTE);
+  } catch {
+    /* aba anônima: nada guardado. */
+  }
+}
+
 function useHydrated() {
   const [h, setH] = useState(false);
   useEffect(() => setH(true), []);
@@ -35,7 +55,7 @@ function useHydrated() {
 }
 
 export function TrackingPanel() {
-  const { autenticado } = useSessao();
+  const { autenticado, carregando: carregandoSessao } = useSessao();
   // `codeState` é o que está no campo; a busca usa uma cópia local (`code`)
   // para poder receber um código por argumento na retomada automática.
   const [codeState, setCode] = useState("");
@@ -53,11 +73,15 @@ export function TrackingPanel() {
   const hydrated = useHydrated();
 
   /*
-   * O PONTO FINAL É A AUTORIZAÇÃO DO APP NO MERCADO LIVRE.
+   * QUEM PRECISA AUTORIZAR O APP NO MERCADO LIVRE É DECIDIDO POR PEDIDO.
    *
-   * Ter conta criada não basta: sem a conexão feita, o rastreio não abre. Quem
-   * clicar em rastrear sem ela vai direto para a tela de autorização — o mesmo
-   * destino do botão "Conectar Mercado Livre".
+   * O código é buscado primeiro; só depois se olha se AQUELE pedido pede a
+   * autorização (`pedeAutorizacaoMl`: a escolha feita no painel para ele, ou o
+   * botão "Rastreio livre" quando não há escolha). Antes a trava valia para o
+   * site inteiro: para cobrar um cliente, todos eram mandados ao Mercado Livre.
+   *
+   * Ter conta criada não basta: sem a conexão feita, o pedido que pede a
+   * autorização não abre — vai para a mesma tela do "Conectar Mercado Livre".
    *
    * A trava é a conexão EXISTIR, não a sincronização ter terminado. Se fosse
    * a sincronização, uma carga inicial interrompida (o servidor reinicia e ela
@@ -72,11 +96,10 @@ export function TrackingPanel() {
   });
 
   /*
-   * RASTREIO LIVRE — o botão do painel que solta a trava acima.
+   * RASTREIO LIVRE — o botão geral do painel.
    *
-   * Ligado lá, qualquer pessoa rastreia direto, sem passar pelo Mercado Livre.
-   * A pergunta vai ao servidor, que responde só sim/não; qualquer falha vira
-   * "não", mantendo a regra de sempre.
+   * Vale para os pedidos SEM escolha própria. A pergunta vai ao servidor, que
+   * responde só sim/não; qualquer falha vira "não", mantendo a regra de sempre.
    */
   const livre = useQuery({
     queryKey: ["rastreio-livre"],
@@ -88,11 +111,25 @@ export function TrackingPanel() {
   });
 
   const conectado = Boolean(conexao.data?.conectado);
-  const liberado = livre.data === true || conectado;
+  const livreGeral = livre.data === true;
   // Enquanto as consultas não respondem não se sabe se o rastreio está livre
   // nem se há conexão — mandar para o Mercado Livre nessa dúvida tiraria da
   // tela quem não precisava ir.
-  const verificandoConexao = livre.isLoading || (autenticado && conexao.isLoading);
+  const verificandoConexao =
+    livre.isLoading || carregandoSessao || (autenticado && conexao.isLoading);
+
+  /** Este pedido só abre depois de autorizar o Mercado Livre? */
+  const precisaAutorizar = (p: Pedido) => !conectado && pedeAutorizacaoMl(p, livreGeral);
+
+  /*
+   * Pedido que pede a autorização, numa volta do Mercado Livre SEM a conexão
+   * feita (a pessoa recusou ou fechou a tela). Em vez de mandá-la de novo —
+   * em círculo —, o rastreio mostra um aviso com o botão para autorizar.
+   */
+  const [aguardandoAutorizacao, setAguardandoAutorizacao] = useState<string | null>(null);
+
+  // A busca em andamento é a retomada automática (e não um clique)?
+  const retomandoRef = useRef(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-mp", mp);
@@ -101,38 +138,40 @@ export function TrackingPanel() {
   /*
    * Retoma o rastreio depois de autorizar no Mercado Livre.
    *
-   * Quem clicou em "RASTREAR AGORA" sem a conexão foi para o Mercado Livre com
-   * o que digitou guardado. Ao voltar conectado, o campo volta preenchido e a
-   * busca dispara sozinha — sem digitar de novo.
+   * Quem foi mandado ao Mercado Livre saiu com o código guardado. Na volta, o
+   * campo volta preenchido e a busca dispara sozinha — sem digitar de novo.
+   *
+   * O guardado só é apagado quando o pedido ABRE (ou não existe). Se a pessoa
+   * volta e a conexão ainda não apareceu, ele fica: quando ela aparecer, este
+   * efeito roda de novo e abre o pedido.
    */
   useEffect(() => {
-    // Espera a conexão aparecer: retomar antes cairia na mesma trava e
-    // devolveria a pessoa ao Mercado Livre, em círculo.
-    if (!liberado) return;
-    let pendente: string | null = null;
-    try {
-      pendente = sessionStorage.getItem("unific:rastreio-pendente");
-      if (pendente) sessionStorage.removeItem("unific:rastreio-pendente");
-    } catch {
-      pendente = null;
+    if (verificandoConexao) return;
+    const pendente = lerPendente();
+    if (!pendente) return;
+
+    retomandoRef.current = true;
+    const so = digitos(pendente);
+    // 11 dígitos voltam como CPF, o resto como código de rastreio.
+    if (so.length === 11) {
+      setCode(formatarCpf(so));
+      buscaPorCpf.mutate(so);
+    } else {
+      setCode(pendente);
+      setMp("mercado_livre");
+      search.mutate(pendente);
     }
-    if (pendente) {
-      const so = digitos(pendente);
-      // Retoma do mesmo jeito que teria acontecido se a pessoa já estivesse
-      // logada: 11 dígitos voltam como CPF, o resto como código de rastreio.
-      if (so.length === 11) {
-        setCode(formatarCpf(so));
-        buscaPorCpf.mutate(so);
-      } else {
-        setCode(pendente);
-        setMp("mercado_livre");
-        search.mutate(pendente);
-      }
-    }
-    // Dispara na virada para conectado, não no login: a conexão é consultada
-    // por rede e fica pronta depois dele.
+    // Dispara quando as consultas terminam e na virada para conectado: a
+    // conexão é consultada por rede e fica pronta depois do login.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liberado]);
+  }, [verificandoConexao, conectado]);
+
+  /** Lê e zera a marca de retomada da busca que acabou de responder. */
+  const foiRetomada = () => {
+    const r = retomandoRef.current;
+    retomandoRef.current = false;
+    return r;
+  };
 
   // O relógio só roda quando há um pedido na tela, e a cada 20s em vez de 1s:
   // os textos de ETA/progresso mudam por minuto, então 1s só causava re-render
@@ -183,14 +222,14 @@ export function TrackingPanel() {
       void registrar({ code: code.trim(), found: false, source: "nao_encontrado" });
       throw new Error("Código não encontrado. Confira os números e tente de novo.");
     },
-    onSuccess: ({ pedido: p, eventos }) => {
-      setEventosReais(eventos);
-      setPedido(p);
-      setMp(p.marketplace);
-      setView("map");
-      toast.success(`Pedido ${p.tracking_code} localizado!`);
+    onSuccess: ({ pedido: p }) => {
+      if (abrirOuAutorizar(p, foiRetomada())) toast.success(`Pedido ${p.tracking_code} localizado!`);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      // Retomada de um código que não existe mais: não adianta guardar.
+      if (foiRetomada()) limparPendente();
+      toast.error(e.message);
+    },
   });
 
   /**
@@ -209,20 +248,27 @@ export function TrackingPanel() {
       return encontrados;
     },
     onSuccess: (encontrados) => {
+      const retomada = foiRetomada();
       const primeiro = encontrados[0];
       if (encontrados.length === 1 && primeiro) {
-        abrirPedido(primeiro);
-        toast.success(`Pedido ${primeiro.tracking_code} localizado!`);
+        if (abrirOuAutorizar(primeiro, retomada)) toast.success(`Pedido ${primeiro.tracking_code} localizado!`);
         return;
       }
+      // Vários pedidos: cada um decide a autorização quando for escolhido.
+      if (retomada) limparPendente();
       setEscolhas(encontrados);
       toast.success(`${encontrados.length} pedidos encontrados neste CPF.`);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      if (foiRetomada()) limparPendente();
+      toast.error(e.message);
+    },
   });
 
   /** Coloca um pedido na tela, venha ele da busca por código ou por CPF. */
   const abrirPedido = (p: Pedido) => {
+    limparPendente();
+    setAguardandoAutorizacao(null);
     setEscolhas(null);
     setEventosReais(null);
     setPedido(p);
@@ -230,13 +276,34 @@ export function TrackingPanel() {
     setView("map");
   };
 
+  /**
+   * Abre o pedido — ou, se ESTE pedido pede o Mercado Livre e a pessoa não
+   * está conectada, leva à autorização. Devolve `true` quando abriu.
+   *
+   * Na retomada (voltando do Mercado Livre ainda sem a conexão) não manda de
+   * novo: mostra o aviso com o botão, para não prender ninguém em círculo.
+   */
+  const abrirOuAutorizar = (p: Pedido, retomada: boolean): boolean => {
+    if (!precisaAutorizar(p)) {
+      abrirPedido(p);
+      return true;
+    }
+    const codigo = String(p.tracking_code).trim();
+    if (retomada) {
+      setAguardandoAutorizacao(codigo);
+    } else {
+      void irParaAutorizacaoMl(codigo);
+    }
+    return false;
+  };
+
   const [indoParaMl, setIndoParaMl] = useState(false);
 
   /**
    * Leva a pessoa à autorização do app no Mercado Livre.
    *
-   * Guarda o que ela digitou (código ou CPF) para a busca ser refeita sozinha
-   * na volta, sem precisar digitar de novo.
+   * Guarda o código do pedido para a busca ser refeita sozinha na volta, sem
+   * precisar digitar de novo.
    *
    * Dois fluxos, escolhidos pelo estado dela:
    *  - já entrou  → `startMlConnect`, que amarra a conexão ao cadastro dela;
@@ -246,7 +313,7 @@ export function TrackingPanel() {
   const irParaAutorizacaoMl = async (pendente: string) => {
     setIndoParaMl(true);
     try {
-      sessionStorage.setItem("unific:rastreio-pendente", pendente);
+      sessionStorage.setItem(CHAVE_PENDENTE, pendente);
     } catch {
       /* aba anônima: segue sem a retomada automática. */
     }
@@ -285,19 +352,20 @@ export function TrackingPanel() {
     const ehCpf = soDigitos.length === 11;
 
     /*
-     * Sem a conexão do Mercado Livre, nada é rastreado — por código ou por
-     * CPF, sem distinção. Vale tanto para quem não tem conta quanto para quem
-     * criou conta e nunca autorizou o app: os dois vão para a autorização.
+     * A busca vem antes de qualquer ida ao Mercado Livre: só o pedido achado
+     * diz se pede a autorização (veja `abrirOuAutorizar`). Mas a resposta
+     * depende de saber se o rastreio está livre e se há conexão — então
+     * espera essas consultas terminarem.
      */
     if (verificandoConexao) {
       toast.info("Um instante, preparando o rastreio...");
       return;
     }
 
-    if (!liberado) {
-      await irParaAutorizacaoMl(ehCpf ? soDigitos : digitado);
-      return;
-    }
+    // Busca nova: o que tinha ficado guardado de uma ida anterior não vale mais.
+    limparPendente();
+    setAguardandoAutorizacao(null);
+    retomandoRef.current = false;
 
     if (ehCpf) {
       buscaPorCpf.mutate(soDigitos);
@@ -463,25 +531,32 @@ export function TrackingPanel() {
         </p>
       </div>
 
-      {/* Um aviso só, para os dois casos que ainda não podem rastrear: quem não
-          tem conta e quem tem conta mas nunca autorizou o app. Os dois vão para
-          a mesma tela ao clicar em rastrear, então a mensagem é a mesma. */}
-      {!liberado && !verificandoConexao && (
+      {/* Só aparece para o pedido que pede o Mercado Livre, quando a pessoa
+          voltou de lá sem autorizar. Antes um aviso igual ficava aqui para
+          todo visitante — inclusive para quem nunca precisaria autorizar. */}
+      {aguardandoAutorizacao && !conectado && (
         <div className="mx-auto mt-5 max-w-2xl rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-center">
-          <p className="text-xs text-muted-foreground">
-            Ao rastrear, você autoriza o Únific+ na sua conta do Mercado Livre.
-            {!autenticado && (
-              <>
-                {" "}
-                <Link
-                  to="/entrar"
-                  className="inline-flex items-center gap-1 font-bold text-primary underline"
-                >
-                  <LogIn className="h-3 w-3" /> Já tenho conta
-                </Link>
-              </>
-            )}
+          <p className="text-sm font-semibold">
+            Para ver o rastreio {aguardandoAutorizacao}, autorize o Únific+ na sua conta do Mercado Livre.
           </p>
+          <button
+            type="button"
+            onClick={() => void irParaAutorizacaoMl(aguardandoAutorizacao)}
+            disabled={indoParaMl}
+            className="mt-2 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-60"
+          >
+            {indoParaMl ? "ABRINDO O MERCADO LIVRE..." : "AUTORIZAR NO MERCADO LIVRE"}
+          </button>
+          {!autenticado && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              <Link
+                to="/entrar"
+                className="inline-flex items-center gap-1 font-bold text-primary underline"
+              >
+                <LogIn className="h-3 w-3" /> Já tenho conta
+              </Link>
+            </p>
+          )}
         </div>
       )}
 
@@ -549,7 +624,7 @@ export function TrackingPanel() {
               {escolhas.map((p) => (
                 <li key={p.id ?? p.tracking_code}>
                   <button
-                    onClick={() => abrirPedido(p)}
+                    onClick={() => abrirOuAutorizar(p, false)}
                     className="w-full rounded-md border border-border px-3 py-2 text-left text-sm transition-colors hover:border-primary hover:bg-primary/5"
                   >
                     <span className="font-bold">{p.tracking_code}</span>

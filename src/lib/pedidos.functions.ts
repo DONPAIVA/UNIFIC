@@ -30,14 +30,34 @@ const COLUNAS = [
   "ship_date", "delivery_date", "hora_coleta",
   "cpf", "product", "product_value", "weight",
   "invoice_number", "invoice_series", "notes",
-  "progresso_manual", "pausado", "eventos_ajustes",
+  "progresso_manual", "pausado", "eventos_ajustes", "autorizacao_ml",
 ] as const;
+
+/** Só dois valores valem; qualquer outra coisa volta a seguir o botão geral. */
+function modoAutorizacao(valor: unknown): "exigir" | "livre" | null {
+  return valor === "exigir" || valor === "livre" ? valor : null;
+}
+
+/**
+ * O banco ainda não tem a coluna `autorizacao_ml`?
+ *
+ * Acontece entre publicar este código e rodar o SQL
+ * `20261021120000_autorizacao_ml_por_pedido.sql`.
+ */
+function semColunaAutorizacao(error: any): boolean {
+  const msg = String(error?.message ?? "");
+  return /autorizacao_ml/i.test(msg) && /does not exist|could not find/i.test(msg);
+}
+
+const ERRO_SEM_COLUNA_AUTORIZACAO =
+  "Falta rodar no Supabase o SQL 20261021120000_autorizacao_ml_por_pedido.sql.";
 
 function limpar(entrada: Record<string, unknown>): Record<string, unknown> {
   const saida: Record<string, unknown> = {};
   for (const c of COLUNAS) {
     if (c in entrada) saida[c] = entrada[c];
   }
+  if ("autorizacao_ml" in saida) saida["autorizacao_ml"] = modoAutorizacao(saida["autorizacao_ml"]);
 
   /*
    * Tira espaços das pontas do código e do CPF.
@@ -162,9 +182,23 @@ export const adminSalvarPedido = createServerFn({ method: "POST" })
      */
     if (data.id) campos["eventos_ajustes"] = await congelarPassado(data.id, data.dados);
 
-    const { error } = data.id
-      ? await db("pedidos").update(campos).eq("id", data.id)
-      : await db("pedidos").insert(campos);
+    const gravar = (dados: Record<string, unknown>) =>
+      data.id ? db("pedidos").update(dados).eq("id", data.id) : db("pedidos").insert(dados);
+
+    let { error } = await gravar(campos);
+
+    /*
+     * Sem o SQL da autorização rodado, salvar o pedido continua funcionando.
+     *
+     * O formulário manda `autorizacao_ml` sempre. Se a coluna ainda não existe
+     * e nada foi escolhido ali, ela sai do envio e o resto é salvo. Se algo FOI
+     * escolhido, avisa — engolir calado faria parecer que a escolha valeu.
+     */
+    if (error && semColunaAutorizacao(error)) {
+      if (campos["autorizacao_ml"]) throw new Error(ERRO_SEM_COLUNA_AUTORIZACAO);
+      const { autorizacao_ml: _fora, ...semAColuna } = campos;
+      ({ error } = await gravar(semAColuna));
+    }
 
     if (error) {
       if (String((error as any).code) === "23505") {
@@ -185,6 +219,54 @@ export const adminSalvarPedido = createServerFn({ method: "POST" })
     });
 
     return { ok: true };
+  });
+
+/**
+ * Escolhe, para UM pedido, se o rastreio pede a autorização do Mercado Livre.
+ *
+ * Separado do salvar de propósito: é a troca rápida da lista do painel, e não
+ * deve passar pelo congelamento do histórico nem pela checagem de código
+ * repetido — só muda esta coluna.
+ */
+export const adminDefinirAutorizacaoMl = createServerFn({ method: "POST" })
+  .middleware([requireAdminUser])
+  .inputValidator((input: { id: string; modo: "exigir" | "livre" | null }) => ({
+    id: String(input?.id ?? ""),
+    modo: modoAutorizacao(input?.modo),
+  }))
+  .handler(async ({ data, context }) => {
+    if (!data.id) throw new Error("Rastreio não informado.");
+
+    const { db } = await import("./server/db.server");
+    const { logAudit } = await import("./server/audit.server");
+
+    const { data: linha, error } = await db("pedidos")
+      .update({ autorizacao_ml: data.modo })
+      .eq("id", data.id)
+      .select("tracking_code")
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        semColunaAutorizacao(error)
+          ? ERRO_SEM_COLUNA_AUTORIZACAO
+          : error.message || "Não foi possível salvar a escolha.",
+      );
+    }
+    if (!linha) throw new Error("Rastreio não encontrado.");
+
+    await logAudit({
+      adminUserId: context.user.userId,
+      adminEmail: context.user.email,
+      ip: context.user.ip,
+      action: `pedido.autorizacao_ml.${data.modo ?? "padrao"}`,
+      entity: "pedidos",
+      entityId: data.id,
+      success: true,
+      detail: { tracking_code: (linha as any).tracking_code, autorizacao_ml: data.modo },
+    });
+
+    return { modo: data.modo };
   });
 
 /**

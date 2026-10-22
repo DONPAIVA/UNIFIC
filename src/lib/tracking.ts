@@ -32,9 +32,30 @@ export type Pedido = {
   hora_coleta?: string | null;
   /** Data/hora ajustada à mão por evento: {"0": "2026-09-03T17:50"}. */
   eventos_ajustes?: Record<string, string> | null;
+  /**
+   * Autorização do Mercado Livre escolhida para ESTE pedido.
+   * Nulo = segue o botão "Rastreio livre"; "exigir" = sempre pede;
+   * "livre" = nunca pede.
+   */
+  autorizacao_ml?: ModoAutorizacaoMl | null;
   created_at: string;
   updated_at?: string;
 };
+
+export type ModoAutorizacaoMl = "exigir" | "livre";
+
+/**
+ * Este pedido manda a pessoa autorizar o Mercado Livre antes de abrir?
+ *
+ * A escolha do pedido ganha do botão geral: assim dá para cobrar a
+ * autorização de um cliente só sem desligar o rastreio livre de todos — ou
+ * deixar alguns livres com ele desligado. Sem escolha, vale o botão geral.
+ */
+export function pedeAutorizacaoMl(p: Pick<Pedido, "autorizacao_ml">, rastreioLivre: boolean): boolean {
+  if (p.autorizacao_ml === "exigir") return true;
+  if (p.autorizacao_ml === "livre") return false;
+  return !rastreioLivre;
+}
 
 export const STATE_COORDS: Record<string, [number, number]> = {
   AC: [-9.97, -67.81], AL: [-9.65, -35.73], AP: [0.03, -51.06], AM: [-3.11, -60.02],
