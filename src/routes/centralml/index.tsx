@@ -31,6 +31,7 @@ import {
   Key,
   LoaderCircle,
   LogOut,
+  Menu,
   MessageCircle,
   Package,
   Play,
@@ -48,6 +49,7 @@ import {
   Truck,
   UserCheck,
   Users,
+  X,
   XCircle,
 } from "lucide-react";
 import { ERRO_2FA } from "@/lib/auth-middleware";
@@ -203,12 +205,12 @@ function LogoML({ className = "h-9 w-9" }: { className?: string }) {
  */
 function Panel({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.18)]">
+    <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
       <div className="h-1 w-full bg-[#FFE600]" />
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
-        <h2 className="flex items-center gap-2.5 text-sm font-black uppercase tracking-wide text-[#1F5FD4]">
-          <span className="h-4 w-1 rounded-full bg-[#FFE600]" />
-          {title}
+        <h2 className="flex min-w-0 items-center gap-2.5 text-sm font-black uppercase tracking-wide text-[#1F5FD4]">
+          <span className="h-4 w-1 shrink-0 rounded-full bg-[#FFE600]" />
+          <span className="min-w-0 break-words">{title}</span>
         </h2>
         {right}
       </header>
@@ -225,7 +227,7 @@ function Stat({ label, value, tone = "default" }: { label: string; value: React.
   const toneClass =
     tone === "alert" ? "text-red-700" : tone === "ok" ? "text-emerald-700" : "text-[#1F5FD4]";
   return (
-    <div className="rounded-xl border-2 border-[#FFE600] bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.18)]">
+    <div className="rounded-xl border-2 border-[#FFE600] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
       <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-700">{label}</p>
       <p className={`mt-1 text-2xl font-black tabular-nums ${toneClass}`}>{value}</p>
     </div>
@@ -247,7 +249,7 @@ function Empty({ children = SEM_DADOS }: { children?: React.ReactNode }) {
 function Loading() {
   return (
     <div className="flex items-center justify-center gap-2 py-10 text-zinc-700">
-      <LoaderCircle className="h-5 w-5 animate-spin" />
+      <LoaderCircle className="h-5 w-5 animate-spin text-[#1F5FD4]" />
       <span className="text-sm">Carregando…</span>
     </div>
   );
@@ -425,7 +427,7 @@ function TelaDoCodigo({ onOk, onSair }: { onOk: () => void; onSair: () => void }
         <div className="flex items-center gap-3">
           <img src={mlLogo} alt="" className="h-10 w-10 rounded-xl" width={40} height={40} />
           <div className="leading-none">
-            <span className="block text-lg font-black tracking-tight text-[#2D3277]">
+            <span className="block text-lg font-black tracking-tight text-[#1F5FD4]">
               VERIFICAÇÃO EM DUAS ETAPAS
             </span>
             <span className="mt-1 block text-[11px] font-bold text-zinc-700">
@@ -446,7 +448,7 @@ function TelaDoCodigo({ onOk, onSair }: { onOk: () => void; onSair: () => void }
           autoComplete="one-time-code"
           autoFocus
           placeholder="000000"
-          className="mt-4 w-full rounded-xl border-2 border-zinc-300 bg-white px-3 py-3 text-center font-mono text-2xl tracking-[0.4em] text-zinc-900 outline-none focus:border-[#3483FA]"
+          className="mt-4 w-full rounded-xl border-2 border-zinc-300 bg-white px-3 py-3 text-center font-mono text-2xl tracking-[0.4em] text-zinc-900 outline-none focus:border-[#1F5FD4]"
         />
 
         {erro && <p className="mt-3 text-xs font-bold text-red-700">{erro}</p>}
@@ -454,7 +456,7 @@ function TelaDoCodigo({ onOk, onSair }: { onOk: () => void; onSair: () => void }
         <button
           type="submit"
           disabled={busy}
-          className="mt-4 w-full rounded-xl bg-[#3483FA] py-3 text-sm font-black text-white disabled:opacity-60"
+          className="mt-4 w-full rounded-xl bg-[#1F5FD4] py-3 text-sm font-black text-white disabled:opacity-60"
         >
           {busy ? "CONFERINDO..." : "ENTRAR"}
         </button>
@@ -548,7 +550,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
     "w-full rounded-lg border-2 border-[#FFE600] bg-white py-3.5 pl-11 pr-4 text-base font-semibold text-zinc-900 " +
     "placeholder:text-zinc-700 placeholder:text-[13px] placeholder:font-bold " +
     "placeholder:uppercase placeholder:tracking-[0.12em] outline-none transition " +
-    "focus:border-[#3483FA] focus:ring-2 focus:ring-[#3483FA]/20";
+    "focus:border-[#1F5FD4] focus:ring-2 focus:ring-[#1F5FD4]/20";
 
   return (
     <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
@@ -580,7 +582,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
             width={64}
             height={64}
           />
-          <h1 className="mt-5 text-[21px] font-black uppercase leading-tight tracking-[0.12em] text-[#2D3277]">
+          <h1 className="mt-5 text-[21px] font-black uppercase leading-tight tracking-[0.12em] text-[#1F5FD4]">
             Olho de Deus ML
           </h1>
           <p className="mt-2 text-[12px] font-bold uppercase tracking-[0.14em] text-zinc-700">
@@ -642,14 +644,14 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
         )}
 
         {/*
-          Azul #3483FA é a cor de AÇÃO do Mercado Livre — é o botão da tela de
+          Azul #1F5FD4 é a cor de AÇÃO do Mercado Livre — é o botão da tela de
           login real deles. O amarelo é a cor de identidade, usada em fundo e
           cabeçalho, não em botão primário. Trocar respeita o padrão da marca.
         */}
         <button
           type="submit"
           disabled={busy}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-[#3483FA] px-4 py-3.5 text-[15px] font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-[#2968C8] disabled:opacity-60"
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-[#1F5FD4] px-4 py-3.5 text-[15px] font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-[#1A4FB0] disabled:opacity-60"
         >
           {busy ? (
             <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -665,7 +667,7 @@ function LoginScreen({ onSignedIn, notice }: { onSignedIn: () => void; notice?: 
         <button
           type="button"
           onClick={() => void recuperarSenha()}
-          className="mt-3 w-full rounded-md bg-[#3483FA]/10 px-4 py-3 text-[15px] font-bold text-[#1F5FD4] transition hover:bg-[#3483FA]/15"
+          className="mt-3 w-full rounded-md bg-[#1F5FD4]/10 px-4 py-3 text-[15px] font-bold text-[#1F5FD4] transition hover:bg-[#1F5FD4]/15"
         >
           Recuperar acesso
         </button>
@@ -750,35 +752,28 @@ function CentralML() {
   /** Conta selecionada — todas as abas filtram por ela quando definida. */
   const [accountId, setAccountId] = useState<string | null>(null);
 
-  /*
-   * Grupos abertos na navegação.
-   *
-   * Começa só com o grupo da aba atual. Deixar todos fechados economizaria
-   * mais espaço, mas esconderia onde você está — e a primeira coisa a fazer
-   * seria abrir justamente aquele grupo. Os outros três ficam recolhidos.
-   */
-  const [gruposAbertos, setGruposAbertos] = useState<Grupo[]>(() => {
-    const inicial = TABS.find((t) => t.id === "dashboard")?.grupo;
-    return inicial ? [inicial] : [];
-  });
+  /** Gaveta de navegação do celular. No computador o menu fica sempre à vista. */
+  const [menuAberto, setMenuAberto] = useState(false);
 
-  const alternarGrupo = (g: Grupo) =>
-    setGruposAbertos((atuais) =>
-      atuais.includes(g) ? atuais.filter((x) => x !== g) : [...atuais, g],
-    );
-
-  /**
-   * Troca de aba abrindo o grupo dela.
-   *
-   * Sem isto, escolher uma aba por outro caminho — um atalho do painel, por
-   * exemplo — deixaria a navegação apontando para um grupo fechado, e não
-   * daria para ver onde você está.
-   */
+  /** Troca de aba, fecha a gaveta do celular e volta ao topo da página. */
   const irParaAba = (id: TabId) => {
     setTab(id);
-    const grupo = TABS.find((t) => t.id === id)?.grupo;
-    if (grupo) setGruposAbertos((atuais) => (atuais.includes(grupo) ? atuais : [...atuais, grupo]));
+    setMenuAberto(false);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  // Gaveta aberta: trava a rolagem do fundo e fecha com Esc.
+  useEffect(() => {
+    if (!menuAberto) return;
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuAberto(false);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = anterior;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menuAberto]);
 
   /** Senha aceita, mas falta o código de 6 dígitos do aplicativo. */
   const [pedindoCodigo, setPedindoCodigo] = useState(false);
@@ -844,7 +839,7 @@ function CentralML() {
   if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <LoaderCircle className="h-10 w-10 animate-spin text-[#00ff41]" />
+        <LoaderCircle className="h-10 w-10 animate-spin text-[#FFE600]" />
       </div>
     );
   }
@@ -864,145 +859,120 @@ function CentralML() {
     );
   }
 
+  const abaAtual = TABS.find((t) => t.id === tab) ?? TABS[0]!;
+  const IconeAtual = abaAtual.icon;
+
   return (
-    <div className="min-h-screen text-zinc-900">
-      <div className="relative z-10">
-        {/* Faixa azul-marinho embaixo do amarelo: é a assinatura do cabeçalho
-            do Mercado Livre e dá acabamento à barra fixa ao rolar. */}
-        <header className="sticky top-0 z-40 border-b-4 border-[#2D3277] bg-[#FFE600] px-4 py-3 shadow-lg">
-          <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              {/* Mesma logo da tela de login — a marca fica igual da entrada
-                  ao painel, sem troca de desenho no meio do caminho. */}
-              <img
-                src={mlLogo}
-                alt="Mercado Livre"
-                className="h-10 w-10 rounded-xl shadow-sm"
-                width={40}
-                height={40}
-              />
-              <div className="leading-none">
-                <span className="block text-xl font-black tracking-tight text-[#2D3277]">OLHO DE DEUS ML</span>
-                <span className="mt-0.5 block text-[10px] font-black uppercase tracking-[0.16em] text-[#2D3277]">
-                  Painel do Mercado Livre
-                </span>
-              </div>
-              <Badge className="ml-1 border-[#2D3277]/25 bg-[#2D3277]/10 text-[#2D3277]">
-                {session.isAdmin ? "Administrador" : "Meu painel"}
-              </Badge>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <a href="/" className="flex items-center gap-1 text-xs font-bold text-black/70 hover:text-black">
-                <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao Unific+
-              </a>
-              <span className="text-xs font-semibold text-black/70">{session.email}</span>
+    // Sem fundo próprio: o Matrix (global, em __root.tsx) aparece por trás.
+    <div className="relative z-10 min-h-screen text-zinc-900">
+      {/* Amarelo do Mercado Livre com a faixa azul embaixo — o cabeçalho de
+          sempre do painel. */}
+      <header className="sticky top-0 z-40 border-b-4 border-[#1F5FD4] bg-[#FFE600] shadow-[0_6px_24px_rgba(0,0,0,0.45)]">
+        <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-3 px-3 sm:px-5">
+          <button
+            onClick={() => setMenuAberto(true)}
+            className="-ml-1 flex h-10 w-10 items-center justify-center rounded-xl text-[#1F5FD4] hover:bg-black/10 lg:hidden"
+            aria-label="Abrir menu"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+
+          <img src={mlLogo} alt="Mercado Livre" className="h-10 w-10 shrink-0 rounded-xl shadow-sm" width={40} height={40} />
+          <div className="min-w-0 leading-none">
+            <span className="block truncate text-lg font-black tracking-tight text-[#1F5FD4] sm:text-xl">OLHO DE DEUS ML</span>
+            <span className="mt-1 hidden text-[10px] font-black uppercase tracking-[0.16em] text-[#1F5FD4]/80 sm:block">
+              Painel do Mercado Livre
+            </span>
+          </div>
+
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
+            <a
+              href="/"
+              className="hidden items-center gap-1 text-xs font-bold text-black/70 hover:text-black sm:flex"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao Unific+
+            </a>
+            <span className="hidden max-w-[220px] truncate text-xs font-semibold text-black/70 md:block">{session.email}</span>
+            <button
+              onClick={signOut}
+              className="flex h-9 items-center gap-1 rounded-lg bg-black/10 px-3 text-xs font-bold text-black hover:bg-black/20"
+              title="Sair"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Sair</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Gaveta do celular: o mesmo menu do computador, deslizando da esquerda. */}
+      {menuAberto && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <button
+            className="absolute inset-0 bg-black/70 backdrop-blur-[2px]"
+            onClick={() => setMenuAberto(false)}
+            aria-label="Fechar menu"
+          />
+          <div className="absolute inset-y-0 left-0 flex w-[84%] max-w-[320px] flex-col bg-white shadow-2xl">
+            <div className="flex h-16 shrink-0 items-center gap-3 border-b-4 border-[#1F5FD4] bg-[#FFE600] px-4">
+              <img src={mlLogo} alt="" className="h-9 w-9 rounded-xl" width={36} height={36} />
+              <span className="text-base font-black tracking-tight text-[#1F5FD4]">OLHO DE DEUS ML</span>
               <button
-                onClick={signOut}
-                className="flex items-center gap-1 rounded-lg bg-black/10 px-3 py-1.5 text-xs font-bold text-black hover:bg-black/20"
+                onClick={() => setMenuAberto(false)}
+                className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg text-[#1F5FD4] hover:bg-black/10"
+                aria-label="Fechar menu"
               >
-                <LogOut className="h-3.5 w-3.5" /> Sair
+                <X className="h-5 w-5" />
               </button>
             </div>
+            <div className="flex-1 overflow-y-auto p-3">
+              <Navegacao tab={tab} onPick={irParaAba} />
+            </div>
+            <div className="shrink-0 border-t border-zinc-200 p-3">
+              <p className="truncate px-2 text-xs font-semibold text-zinc-600">{session.email}</p>
+              <a
+                href="/"
+                className="mt-2 flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-bold text-[#1F5FD4] hover:bg-[#FFFBE0]"
+              >
+                <ArrowLeft className="h-4 w-4" /> Voltar ao Unific+
+              </a>
+            </div>
           </div>
-        </header>
+        </div>
+      )}
 
-        <div className="mx-auto max-w-[1400px] px-4 py-5">
+      <div className="mx-auto flex max-w-[1440px] gap-6 px-3 py-4 sm:px-5 sm:py-6">
+        <aside className="hidden w-60 shrink-0 lg:block">
+          {/* Branco como os cartões: sobre o Matrix, fundo sólido é o que
+              deixa o menu legível. */}
+          <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
+            <div className="h-1 w-full bg-[#FFE600]" />
+            <div className="max-h-[calc(100vh-7.25rem)] overflow-y-auto p-3">
+              <Navegacao tab={tab} onPick={irParaAba} />
+            </div>
+          </div>
+        </aside>
+
+        <main className="min-w-0 flex-1">
+          {/* Título da seção numa faixa escura sólida, para ler bem por cima
+              da chuva de caracteres. */}
+          <div className="mb-4 flex items-center gap-3 rounded-xl border border-white/10 bg-black/75 px-3 py-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#FFE600] text-[#1F5FD4]">
+              <IconeAtual className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#FFE600]">{abaAtual.grupo}</p>
+              <h1 className="truncate text-xl font-black uppercase tracking-wide text-white sm:text-2xl">{abaAtual.label}</h1>
+            </div>
+          </div>
+
           <AccountSelector accountId={accountId} onChange={setAccountId} />
-
-          {/*
-            Navegação em quatro blocos, cada um numa coluna própria.
-
-            Antes era uma fileira por grupo, com um rótulo estreito à esquerda e
-            os botões espremidos à direita — sobrava branco no fim de cada linha
-            e os grupos não tinham peso visual nenhum. Em colunas, cada família
-            ocupa a sua faixa inteira e os botões respiram.
-
-            A grade acompanha a tela: uma coluna no celular, duas no tablet e as
-            quatro lado a lado no computador.
-          */}
-          <nav className="mt-4 overflow-hidden rounded-2xl border-2 border-zinc-200 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.22)]">
-            <div className="h-1.5 w-full bg-[#FFE600]" />
-
-            {GRUPOS.map((grupo, indice) => {
-              const abas = TABS.filter((t) => t.grupo === grupo);
-              const aberto = gruposAbertos.includes(grupo);
-              const aqui = abas.some((a) => a.id === tab);
-
-              return (
-                <div key={grupo} className={indice > 0 ? "border-t border-zinc-200" : ""}>
-                  <button
-                    onClick={() => alternarGrupo(grupo)}
-                    aria-expanded={aberto}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[#FFFBE0]"
-                  >
-                    <span className="h-5 w-1.5 shrink-0 rounded-full bg-[#FFE600]" />
-                    <span className="text-sm font-black uppercase tracking-[0.12em] text-[#1F5FD4]">
-                      {grupo}
-                    </span>
-
-                    {/* Fechado com a aba atual dentro: o ponto amarelo diz onde
-                        você está sem precisar abrir para procurar. */}
-                    {!aberto && aqui && (
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#FFE600] ring-2 ring-[#2D3277]" />
-                    )}
-
-                    <span className="ml-auto flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-zinc-600">{abas.length}</span>
-                      <ChevronDown
-                        className={`h-5 w-5 text-[#2D3277] transition-transform duration-200 ${
-                          aberto ? "rotate-180" : ""
-                        }`}
-                      />
-                    </span>
-                  </button>
-
-                  {aberto && (
-                    <div className="grid gap-2 px-4 pb-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {abas.map(({ id, label, icon: Icon }) => {
-                        const ativa = tab === id;
-                        return (
-                          <button
-                            key={id}
-                            onClick={() => irParaAba(id)}
-                            className={`group flex items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left text-sm font-bold transition-all ${
-                              ativa
-                                ? // Amarelo com texto azul-marinho: o par de cores
-                                  // do Mercado Livre, e destaca mais que o azul
-                                  // cheio, que competia com os botões de ação.
-                                  "border-[#FFE600] bg-[#FFE600] text-[#2D3277] shadow-md"
-                                : "border-transparent bg-zinc-50 text-zinc-700 hover:border-[#FFE600] hover:bg-white hover:text-[#1F5FD4]"
-                            }`}
-                          >
-                            <span
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                                ativa
-                                  ? "bg-[#2D3277] text-[#FFE600]"
-                                  : "bg-white text-[#1F5FD4] group-hover:bg-[#FFFBE0]"
-                              }`}
-                            >
-                              <Icon className="h-4 w-4" />
-                            </span>
-                            <span className="truncate">{label}</span>
-                            {ativa && (
-                              <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-[#2D3277]" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
 
           <div className="mt-4 space-y-4 pb-12">
             {tab === "dashboard" && (
               <DashboardTab
                 onOpenAccount={(id) => {
                   setAccountId(id);
-                  // `irParaAba` em vez de `setTab`: abre o grupo "Visão geral"
-                  // junto, senão a navegação apontaria para um grupo fechado.
                   irParaAba("contas");
                 }}
               />
@@ -1024,9 +994,53 @@ function CentralML() {
             {tab === "configuracoes" && <ConfiguracoesTab isAdmin={session.isAdmin} />}
             {tab === "auditoria" && <AuditoriaTab />}
           </div>
-        </div>
+        </main>
       </div>
     </div>
+  );
+}
+
+/**
+ * Menu do painel, usado na lateral do computador e na gaveta do celular.
+ * Os quatro grupos ficam sempre abertos: são 17 itens, cabem numa coluna e
+ * você enxerga tudo sem precisar expandir nada.
+ */
+function Navegacao({ tab, onPick }: { tab: TabId; onPick: (id: TabId) => void }) {
+  return (
+    <nav className="space-y-4">
+      {GRUPOS.map((grupo) => (
+        <div key={grupo}>
+          <p className="flex items-center gap-2 px-2.5 pb-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-[#1F5FD4]">
+            <span className="h-3.5 w-1 rounded-full bg-[#FFE600]" />
+            {grupo}
+          </p>
+          <ul className="space-y-0.5">
+            {TABS.filter((t) => t.grupo === grupo).map(({ id, label, icon: Icon }) => {
+              const ativa = tab === id;
+              return (
+                <li key={id}>
+                  <button
+                    onClick={() => onPick(id)}
+                    aria-current={ativa ? "page" : undefined}
+                    className={`group flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${
+                      ativa
+                        ? // Amarelo com texto azul: o par de cores do Mercado Livre.
+                          "bg-[#FFE600] font-black text-[#1F5FD4] shadow-[0_0_16px_rgba(255,230,0,0.25)]"
+                        : "font-bold text-zinc-700 hover:bg-[#FFFBE0] hover:text-[#1F5FD4]"
+                    }`}
+                  >
+                    <Icon
+                      className={`h-4 w-4 shrink-0 ${ativa ? "text-[#1F5FD4]" : "text-zinc-400 group-hover:text-[#1F5FD4]"}`}
+                    />
+                    <span className="truncate">{label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
   );
 }
 
@@ -1039,39 +1053,59 @@ function AccountSelector({ accountId, onChange }: { accountId: string | null; on
   const accounts = data ?? [];
   const current = accounts.find((a: any) => a.id === accountId) ?? null;
 
+  const nome = current ? current.nickname || current.ml_user_id : null;
+
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white/95 p-4 shadow-sm backdrop-blur">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Users className="h-4 w-4 text-[#1F5FD4]" />
-          <span className="text-sm font-bold text-zinc-700">Conta em foco:</span>
-          {current ? (
-            <>
-              <span className="text-sm font-bold text-[#1F5FD4]">{current.nickname || current.ml_user_id}</span>
-              <Badge className={accountStatus(current.status).className}>{accountStatus(current.status).label}</Badge>
-              <Badge className={`border-transparent ${TOKEN_STATE[current.tokenStatus?.state ?? ""]?.className ?? "bg-zinc-100 text-zinc-700"}`}>
-                {TOKEN_STATE[current.tokenStatus?.state ?? ""]?.label ?? "—"}
-              </Badge>
-            </>
-          ) : (
-            <span className="text-sm text-zinc-700">Todas as contas</span>
-          )}
+    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
+      <div className="h-1 w-full bg-[#FFE600]" />
+      <div className="flex flex-col gap-3 p-3 sm:p-4 md:flex-row md:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFE600] text-sm font-black uppercase text-[#1F5FD4]">
+            {nome ? String(nome).slice(0, 1) : <Users className="h-4 w-4" />}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Conta em foco</p>
+            <p className="truncate text-sm font-black text-[#1F5FD4]">
+              {nome ?? `Todas as contas${accounts.length ? ` · ${accounts.length}` : ""}`}
+            </p>
+            {current && (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                <Badge className={accountStatus(current.status).className}>{accountStatus(current.status).label}</Badge>
+                <Badge
+                  className={`border-transparent ${TOKEN_STATE[current.tokenStatus?.state ?? ""]?.className ?? "bg-zinc-100 text-zinc-700"}`}
+                >
+                  {TOKEN_STATE[current.tokenStatus?.state ?? ""]?.label ?? "—"}
+                </Badge>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={accountId ?? ""}
-            onChange={(e) => onChange(e.target.value || null)}
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-800"
+        {/* min-w-0 + w-full: sem isso o <select> cresce até o nome mais
+            comprido da lista e vaza para fora da tela no celular. */}
+        <div className="flex w-full min-w-0 items-center gap-2 md:w-auto">
+          <div className="relative min-w-0 flex-1 md:w-80 md:flex-none">
+            <select
+              value={accountId ?? ""}
+              onChange={(e) => onChange(e.target.value || null)}
+              className="h-10 w-full min-w-0 cursor-pointer appearance-none truncate rounded-lg border border-zinc-300 bg-white pl-3 pr-9 text-sm font-semibold text-zinc-800 outline-none transition focus:border-[#1F5FD4] focus:ring-2 focus:ring-[#FFE600]"
+              aria-label="Conta em foco"
+            >
+              <option value="">Todas as contas</option>
+              {accounts.map((a: any) => (
+                <option key={a.id} value={a.id}>
+                  {a.nickname || a.ml_user_id} — {accountStatus(a.status).label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#1F5FD4]" />
+          </div>
+          <button
+            onClick={reload}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+            title="Recarregar contas"
+            aria-label="Recarregar contas"
           >
-            <option value="">Todas as contas</option>
-            {accounts.map((a: any) => (
-              <option key={a.id} value={a.id}>
-                {a.nickname || a.ml_user_id} — {accountStatus(a.status).label}
-              </option>
-            ))}
-          </select>
-          <button onClick={reload} className="rounded-lg bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200" title="Recarregar contas">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
@@ -1199,10 +1233,14 @@ function DashboardTab({ onOpenAccount }: { onOpenAccount: (id: string) => void }
             <ul className="space-y-2">
               {data.lastLogs.map((l: any) => (
                 <li key={l.id} className="flex items-start gap-2 text-xs">
-                  <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${l.level === "error" ? "bg-red-500" : l.level === "warn" ? "bg-amber-500" : "bg-emerald-500"}`} />
-                  <span className="w-36 shrink-0 text-zinc-700">{fmtDateTime(l.created_at)}</span>
-                  <span className="w-28 shrink-0 font-semibold text-zinc-700">{l.category}</span>
-                  <span className="flex-1 text-zinc-600">{l.error || l.message || l.action}</span>
+                  <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${l.level === "error" ? "bg-red-500" : l.level === "warn" ? "bg-amber-500" : "bg-emerald-500"}`} />
+                  {/* No celular data e categoria sobem para uma linha própria,
+                      e a mensagem quebra em vez de vazar do cartão. */}
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:gap-2">
+                    <span className="shrink-0 text-zinc-500 sm:w-36">{fmtDateTime(l.created_at)}</span>
+                    <span className="shrink-0 font-semibold text-zinc-700 sm:w-28">{l.category}</span>
+                    <span className="min-w-0 flex-1 break-words text-zinc-600">{l.error || l.message || l.action}</span>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -1311,7 +1349,7 @@ function ContasTab({ accountId, onSelect }: { accountId: string | null; onSelect
                   <button
                     disabled={busy !== null}
                     onClick={() => run("Renovar token", a.id, () => adminRefreshToken({ data: { accountId: a.id } }))}
-                    className="rounded-md bg-[#3483FA] px-2 py-1 text-[11px] font-bold text-white hover:bg-[#2968C8] disabled:opacity-50"
+                    className="rounded-md bg-[#1F5FD4] px-2 py-1 text-[11px] font-bold text-white hover:bg-[#1A4FB0] disabled:opacity-50"
                   >
                     Renovar
                   </button>
@@ -1510,14 +1548,14 @@ function EnviarMensagem({ orderId, onEnviado }: { orderId: string; onEnviado: ()
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
         rows={3}
-        className="w-full rounded-lg border border-zinc-300 bg-white p-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#3483FA]"
+        className="w-full rounded-lg border border-zinc-300 bg-white p-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#1F5FD4]"
         placeholder="Escreva uma mensagem para o vendedor…"
       />
       <div className="mt-2 flex items-center gap-3">
         <button
           onClick={enviar}
           disabled={enviando || !texto.trim()}
-          className="flex items-center gap-2 rounded-lg bg-[#3483FA] px-4 py-2 text-sm font-bold text-white hover:bg-[#2968C8] disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg bg-[#1F5FD4] px-4 py-2 text-sm font-bold text-white hover:bg-[#1A4FB0] disabled:opacity-50"
         >
           {enviando ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           Enviar mensagem
@@ -1587,7 +1625,7 @@ function PedidosTab({ accountId }: { accountId: string | null }) {
             <option value="cancelled">cancelled</option>
             <option value="invalid">invalid</option>
           </select>
-          <button onClick={() => setTerm(q)} className="rounded-lg bg-[#3483FA] px-3 py-1.5 text-xs font-bold text-white">
+          <button onClick={() => setTerm(q)} className="rounded-lg bg-[#1F5FD4] px-3 py-1.5 text-xs font-bold text-white">
             Buscar
           </button>
           <button onClick={reload} className="rounded-lg bg-zinc-100 p-1.5 text-zinc-600 hover:bg-zinc-200">
@@ -1732,7 +1770,7 @@ function PedidoDetalhe({ id, onBack }: { id: string; onBack: () => void }) {
                 onChange={(e) => setComentario(e.target.value.slice(0, 160))}
                 rows={2}
                 maxLength={160}
-                className="mt-3 w-full rounded-lg border border-zinc-300 bg-white p-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#3483FA]"
+                className="mt-3 w-full rounded-lg border border-zinc-300 bg-white p-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#1F5FD4]"
                 placeholder="Comentário para o vendedor (opcional, até 160 caracteres)"
               />
               <p className="mt-1 text-right text-[10px] text-zinc-600">{comentario.length}/160</p>
@@ -1892,7 +1930,7 @@ function RastreamentosTab({ accountId }: { accountId: string | null }) {
           <button
             key={id}
             onClick={() => setModo(id)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-bold backdrop-blur ${modo === id ? "bg-[#3483FA] text-white" : "bg-white/90 text-zinc-700"}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold backdrop-blur ${modo === id ? "bg-[#1F5FD4] text-white" : "bg-white/90 text-zinc-700"}`}
           >
             {label}
           </button>
@@ -2153,7 +2191,7 @@ function SincronizacoesTab({ accountId }: { accountId: string | null }) {
           <button
             onClick={() => sincronizar(true)}
             disabled={busy}
-            className="rounded-lg bg-[#3483FA] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#2968C8] disabled:opacity-60"
+            className="rounded-lg bg-[#1F5FD4] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#1A4FB0] disabled:opacity-60"
           >
             Sincronização completa
           </button>
@@ -2357,11 +2395,11 @@ function AoVivoTab() {
                 <td className="px-2 py-2 text-xs">{fmtDateTime(t.quando)}</td>
                 <td className="px-2 py-2 text-xs">
                   {t.painel === "olho_de_deus" ? (
-                    <span className="whitespace-nowrap rounded bg-[#2D3277] px-1.5 py-0.5 text-[10px] font-black text-[#FFE600]">
+                    <span className="whitespace-nowrap rounded bg-[#1F5FD4] px-1.5 py-0.5 text-[10px] font-black text-[#FFE600]">
                       OLHO DE DEUS
                     </span>
                   ) : t.painel === "rastreios" ? (
-                    <span className="whitespace-nowrap rounded bg-[#FFE600] px-1.5 py-0.5 text-[10px] font-black text-[#2D3277]">
+                    <span className="whitespace-nowrap rounded bg-[#FFE600] px-1.5 py-0.5 text-[10px] font-black text-[#1F5FD4]">
                       RASTREIOS
                     </span>
                   ) : (
@@ -2453,17 +2491,58 @@ function AoVivoTab() {
  * Reclamação vinculada ao pedido, com as ações que o Mercado Livre permite.
  *
  * IMPORTANTE, e o motivo de não existir botão "abrir reclamação":
- * o ML não expõe endpoint público para ABRIR nem para ENCERRAR reclamação
- * diretamente. Quem abre é o comprador, pelo site ou app deles.
+ * o ML não expõe endpoint público para ABRIR reclamação. Quem abre é o
+ * comprador, pelo site ou app deles.
  *
- * O que a API oferece é `/claims/{id}/actions`: uma lista do que PODE ser
- * feito naquela reclamação específica, que muda conforme o estágio e conforme
- * você ser comprador ou vendedor. Às vezes essa lista inclui encerrar.
+ * ENCERRAR é por resolução: reembolso total, parcial, devolução ou mediação.
+ * Qual delas vale depende do estágio e de você ser comprador ou vendedor — o
+ * ML diz isso por reclamação, em players[].available_actions.
  *
  * Por isso os botões aqui são gerados a partir da resposta do ML, nunca
  * fixados no código. Botão que promete o que a API não faz é pior que
  * ausência de botão.
  */
+
+/** Nome legível de cada ação do ML; o código original fica no title do botão. */
+const ROTULO_ACAO: Record<string, string> = {
+  refund: "Reembolsar total (encerra)",
+  allow_partial_refund: "Oferecer reembolso parcial",
+  allow_return: "Autorizar devolução",
+  allow_return_label: "Autorizar devolução",
+  open_dispute: "Abrir mediação",
+  send_message_to_complainant: "Mensagem ao comprador",
+  send_message_to_respondent: "Mensagem ao vendedor",
+  send_message_to_mediator: "Mensagem ao mediador",
+};
+const rotuloAcao = (acao: string) => ROTULO_ACAO[acao] ?? acao;
+
+/**
+ * Confirma e coleta o que a ação exige (mensagem ou percentual).
+ * Devolve null se o operador desistiu.
+ */
+function confirmarAcao(
+  acao: string,
+  claimId: string,
+  textoPronto = "",
+): { texto: string; percentual: number | null } | null {
+  if (acao.startsWith("send_message_to_")) {
+    const texto = (textoPronto || prompt(`${rotuloAcao(acao)} — reclamação ${claimId}:`) || "").trim();
+    return texto ? { texto, percentual: null } : null;
+  }
+  if (acao === "allow_partial_refund") {
+    const v = prompt(`Percentual do reembolso parcial (1 a 99) — reclamação ${claimId}:`);
+    if (v == null || !v.trim()) return null;
+    const percentual = Number(v.replace(",", ".").replace("%", ""));
+    if (!confirm(`Oferecer ${percentual}% de reembolso ao comprador?\n\nSe ele aceitar, a reclamação é encerrada.`)) return null;
+    return { texto: "", percentual };
+  }
+  const aviso =
+    acao === "refund"
+      ? "Devolve o valor TOTAL ao comprador e encerra a reclamação. Não tem volta."
+      : "A ação vale no Mercado Livre e pode ser definitiva.";
+  return confirm(`${rotuloAcao(acao)} — reclamação ${claimId}?\n\n${aviso}`) ? { texto: "", percentual: null } : null;
+}
+
 function ReclamacoesDoPedido({
   accountId,
   reclamacoes,
@@ -2476,13 +2555,11 @@ function ReclamacoesDoPedido({
   const [ocupado, setOcupado] = useState<string | null>(null);
 
   const executar = async (claimId: string, acao: string) => {
-    if (!confirm(`Executar "${acao}" na reclamação ${claimId}?\n\nEsta ação é enviada ao Mercado Livre e pode não ter volta.`)) {
-      return;
-    }
-    const texto = prompt("Mensagem para acompanhar a ação (opcional):") ?? "";
+    const dados = confirmarAcao(acao, claimId);
+    if (!dados) return;
     setOcupado(`${claimId}:${acao}`);
     try {
-      await adminReclamacaoAcao({ data: { accountId, claimId, acao, texto } });
+      await adminReclamacaoAcao({ data: { accountId, claimId, acao, ...dados } });
       onMudou();
     } catch (e) {
       alert(e instanceof Error ? e.message : "O Mercado Livre recusou a ação.");
@@ -2499,7 +2576,7 @@ function ReclamacoesDoPedido({
           <p className="mt-2 px-2 text-[11px] leading-relaxed text-zinc-700">
             Abrir reclamação não é possível por aqui: o Mercado Livre não oferece esse endpoint na API — quem abre é o
             comprador, pelo site ou aplicativo deles. Quando existir uma, ela aparece nesta área com as ações que o
-            próprio ML permitir.
+            próprio ML permitir, inclusive as que encerram (reembolso, devolução).
           </p>
         </>
       ) : (
@@ -2539,11 +2616,14 @@ function ReclamacoesDoPedido({
                       {r.acoesDisponiveis.map((a: string) => (
                         <button
                           key={a}
+                          title={a}
                           disabled={ocupado !== null}
                           onClick={() => void executar(String(r.id), a)}
-                          className="rounded-lg bg-[#3483FA] px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-[#2968C8] disabled:opacity-50"
+                          className={`rounded-lg px-3 py-1.5 text-[11px] font-bold text-white transition disabled:opacity-50 ${
+                            /refund/i.test(a) ? "bg-amber-600 hover:bg-amber-700" : "bg-[#1F5FD4] hover:bg-[#1A4FB0]"
+                          }`}
                         >
-                          {ocupado === `${r.id}:${a}` ? "enviando…" : a}
+                          {ocupado === `${r.id}:${a}` ? "enviando…" : rotuloAcao(a)}
                         </button>
                       ))}
                     </div>
@@ -2748,7 +2828,7 @@ function ClientesTab() {
                       cadastro — por isso não tem CPF, telefone nem PIN. */}
                   {c.origem === "mercado_livre" && (
                     <span
-                      className="ml-2 rounded bg-[#FFE600] px-1.5 py-0.5 text-[10px] font-bold text-[#2D3277]"
+                      className="ml-2 rounded bg-[#FFE600] px-1.5 py-0.5 text-[10px] font-bold text-[#1F5FD4]"
                       title="Entrou autorizando pelo Mercado Livre, sem preencher cadastro."
                     >
                       VIA ML
@@ -2878,7 +2958,7 @@ function LogsTab({ accountId }: { accountId: string | null }) {
                 className="w-48 bg-transparent py-1.5 text-xs text-zinc-900 outline-none placeholder:text-zinc-600"
               />
             </div>
-            <button onClick={() => setTerm(q)} className="rounded-lg bg-[#3483FA] px-3 py-1.5 text-xs font-bold text-white">
+            <button onClick={() => setTerm(q)} className="rounded-lg bg-[#1F5FD4] px-3 py-1.5 text-xs font-bold text-white">
               Filtrar
             </button>
             <button onClick={reload} className="rounded-lg bg-zinc-100 p-1.5 text-zinc-600 hover:bg-zinc-200">
@@ -3078,7 +3158,7 @@ function ErrosTab() {
             }
           }}
           disabled={recuperando}
-          className="mt-4 flex items-center gap-2 rounded-lg bg-[#3483FA] px-4 py-2 text-sm font-bold text-white hover:bg-[#2968C8] disabled:opacity-60"
+          className="mt-4 flex items-center gap-2 rounded-lg bg-[#1F5FD4] px-4 py-2 text-sm font-bold text-white hover:bg-[#1A4FB0] disabled:opacity-60"
         >
           {recuperando ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           Recuperar notificações perdidas
@@ -3127,7 +3207,7 @@ function ErrosTab() {
                     <button
                       onClick={() => reprocessar(w.id)}
                       disabled={busy === w.id}
-                      className="rounded-md bg-[#3483FA] px-2 py-1 text-[11px] font-bold text-white disabled:opacity-50"
+                      className="rounded-md bg-[#1F5FD4] px-2 py-1 text-[11px] font-bold text-white disabled:opacity-50"
                     >
                       {busy === w.id ? "…" : "Reprocessar"}
                     </button>
@@ -3455,14 +3535,14 @@ function PerguntasTab({ accountId }: { accountId: string | null }) {
                       value={texto}
                       onChange={(e) => setTexto(e.target.value)}
                       rows={3}
-                      className="w-full rounded-lg border border-zinc-300 bg-white p-2 text-xs text-zinc-900 outline-none focus:border-[#3483FA]"
+                      className="w-full rounded-lg border border-zinc-300 bg-white p-2 text-xs text-zinc-900 outline-none focus:border-[#1F5FD4]"
                       placeholder="Escreva a resposta…"
                     />
                     <div className="mt-2 flex gap-2">
                       <button
                         onClick={() => responder(String(q.id))}
                         disabled={!texto.trim()}
-                        className="rounded-md bg-[#3483FA] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
+                        className="rounded-md bg-[#1F5FD4] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
                       >
                         Enviar resposta
                       </button>
@@ -3765,20 +3845,13 @@ function ReclamacaoDetalhe({
   const [aviso, setAviso] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const executar = async (acao: string) => {
-    const precisaTexto = /message|mensagem|reply|responder/i.test(acao);
-    if (
-      !confirm(
-        `Executar “${acao}” nesta reclamação?\n\nA ação vale no Mercado Livre e pode ser definitiva.`,
-      )
-    )
-      return;
+    const dados = confirmarAcao(acao, claimId, texto);
+    if (!dados) return;
     setExecutando(acao);
     setAviso(null);
     try {
-      await adminReclamacaoAcao({
-        data: { accountId, claimId, acao, texto: precisaTexto ? texto : "" },
-      });
-      setAviso({ ok: true, msg: `Ação “${acao}” enviada ao Mercado Livre.` });
+      await adminReclamacaoAcao({ data: { accountId, claimId, acao, ...dados } });
+      setAviso({ ok: true, msg: `“${rotuloAcao(acao)}” enviada ao Mercado Livre.` });
       setTexto("");
       reload();
     } catch (e) {
@@ -3860,15 +3933,17 @@ function ReclamacaoDetalhe({
             ) : (
               <>
                 <p className="text-xs text-zinc-700">
-                  Estas são as ações que o próprio Mercado Livre informou para esta reclamação. Nada aqui é inventado:
-                  se não estiver na lista, o sistema recusa antes de chamar a API.
+                  Estas são as ações que o próprio Mercado Livre liberou para esta conta
+                  {data.meuPapel ? ` (${data.meuPapel === "respondent" ? "vendedor" : data.meuPapel === "complainant" ? "comprador" : data.meuPapel})` : ""}{" "}
+                  nesta reclamação. Para encerrar: reembolso total, reembolso parcial aceito pelo comprador, ou devolução
+                  concluída. Se não estiver na lista, o sistema recusa antes de chamar a API.
                 </p>
 
                 <textarea
                   value={texto}
                   onChange={(e) => setTexto(e.target.value)}
                   rows={3}
-                  className="mt-3 w-full rounded-lg border border-zinc-300 bg-white p-2 text-sm text-zinc-900 outline-none focus:border-[#3483FA]"
+                  className="mt-3 w-full rounded-lg border border-zinc-300 bg-white p-2 text-sm text-zinc-900 outline-none focus:border-[#1F5FD4]"
                   placeholder="Mensagem (usada nas ações que pedem texto)"
                 />
 
@@ -3876,18 +3951,19 @@ function ReclamacaoDetalhe({
                   {data.acoesDisponiveis.map((acao: string) => (
                     <button
                       key={acao}
+                      title={acao}
                       onClick={() => executar(acao)}
                       disabled={executando !== null}
                       className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold text-white disabled:opacity-50 ${
-                        /close|resolve|fechar/i.test(acao)
-                          ? "bg-emerald-600 hover:bg-emerald-700"
-                          : /refund|reembols/i.test(acao)
-                            ? "bg-amber-600 hover:bg-amber-700"
-                            : "bg-[#3483FA] hover:bg-[#2968C8]"
+                        /refund/i.test(acao)
+                          ? "bg-amber-600 hover:bg-amber-700"
+                          : /return/i.test(acao)
+                            ? "bg-emerald-600 hover:bg-emerald-700"
+                            : "bg-[#1F5FD4] hover:bg-[#1A4FB0]"
                       }`}
                     >
                       {executando === acao ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-                      {acao}
+                      {rotuloAcao(acao)}
                     </button>
                   ))}
                 </div>
@@ -4008,7 +4084,7 @@ function ConsoleTab({ accountId }: { accountId: string | null }) {
                 key={a.label}
                 onClick={() => aplicar(a)}
                 title={a.nota ?? a.endpoint}
-                className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700 hover:border-[#3483FA] hover:text-[#1F5FD4]"
+                className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700 hover:border-[#1F5FD4] hover:text-[#1F5FD4]"
               >
                 {a.label}
               </button>
@@ -4040,12 +4116,12 @@ function ConsoleTab({ accountId }: { accountId: string | null }) {
             value={endpoint}
             onChange={(e) => setEndpoint(e.target.value)}
             placeholder="/orders/search?buyer=123456"
-            className="min-w-[280px] flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#3483FA]"
+            className="min-w-[280px] flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#1F5FD4]"
           />
           <button
             onClick={executar}
             disabled={running || !accountId}
-            className="flex items-center gap-2 rounded-lg bg-[#3483FA] px-4 py-2 text-sm font-bold text-white hover:bg-[#2968C8] disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-[#1F5FD4] px-4 py-2 text-sm font-bold text-white hover:bg-[#1A4FB0] disabled:opacity-50"
           >
             {running ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
             Executar
@@ -4058,7 +4134,7 @@ function ConsoleTab({ accountId }: { accountId: string | null }) {
             onChange={(e) => setBody(e.target.value)}
             rows={6}
             spellCheck={false}
-            className="mt-3 w-full rounded-lg border border-zinc-300 bg-white p-3 font-mono text-xs text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#3483FA]"
+            className="mt-3 w-full rounded-lg border border-zinc-300 bg-white p-3 font-mono text-xs text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#1F5FD4]"
             placeholder='{"fulfilled": true, "rating": "positive"}'
           />
         )}
@@ -4171,7 +4247,7 @@ function VozDoPainel() {
             setLigada(e.target.checked);
             definirVoz(e.target.checked);
           }}
-          className="h-4 w-4 accent-[#3483FA]"
+          className="h-4 w-4 accent-[#1F5FD4]"
         />
         Falar ao entrar no painel
       </label>
@@ -4191,7 +4267,7 @@ function VozDoPainel() {
         <button
           onClick={() => aberturaDoPainel(nome || undefined)}
           disabled={!ligada}
-          className="rounded-lg bg-[#3483FA] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+          className="rounded-lg bg-[#1F5FD4] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
         >
           Ouvir agora
         </button>
@@ -4377,7 +4453,7 @@ function SegundoFatorPainel() {
             <button
               onClick={() => void confirmar()}
               disabled={busy || codigo.length !== 6}
-              className="rounded-lg bg-[#3483FA] px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
+              className="rounded-lg bg-[#1F5FD4] px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
             >
               Confirmar e ativar
             </button>
@@ -4395,7 +4471,7 @@ function SegundoFatorPainel() {
           <button
             onClick={() => void preparar()}
             disabled={busy}
-            className="mt-3 rounded-lg bg-[#3483FA] px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
+            className="mt-3 rounded-lg bg-[#1F5FD4] px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
           >
             {busy ? "Preparando..." : "Ativar verificação em duas etapas"}
           </button>
@@ -4500,12 +4576,12 @@ function ConfiguracoesTab({ isAdmin }: { isAdmin: boolean }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="email@dominio.com (usuário já existente no Supabase Auth)"
-            className="min-w-[280px] flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#3483FA]"
+            className="min-w-[280px] flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-600 focus:border-[#1F5FD4]"
           />
           <button
             onClick={adicionar}
             disabled={busy || !email.trim()}
-            className="rounded-lg bg-[#3483FA] px-4 py-2 text-sm font-bold text-white hover:bg-[#2968C8] disabled:opacity-50"
+            className="rounded-lg bg-[#1F5FD4] px-4 py-2 text-sm font-bold text-white hover:bg-[#1A4FB0] disabled:opacity-50"
           >
             Adicionar
           </button>

@@ -606,10 +606,10 @@ export const adminOrder = createServerFn({ method: "GET" })
      * dois estágios e filtramos pelo `resource_id`. São duas chamadas leves e
      * é o único caminho confiável.
      *
-     * Para cada uma, perguntamos o que ELE permite fazer agora
-     * (/claims/{id}/actions). A lista muda conforme o estágio e conforme você
-     * ser comprador ou vendedor — por isso nunca inventamos ação: mostramos o
-     * que a API respondeu.
+     * Para cada uma, lemos o detalhe e pegamos o que ELE liberou para esta
+     * conta (players[].available_actions). A lista muda conforme o estágio e
+     * conforme você ser comprador ou vendedor — por isso nunca inventamos
+     * ação: mostramos o que a API respondeu.
      */
     const reclamacoes: any[] = [];
     try {
@@ -623,14 +623,10 @@ export const adminOrder = createServerFn({ method: "GET" })
         .filter((c) => String(c?.resource_id ?? "") === String(order.ml_order_id));
 
       for (const c of doPedido) {
-        const acoes = await mlFetch(conta, `/post-purchase/v1/claims/${c.id}/actions`, { actor: ator });
-        const lista = (
-          Array.isArray(acoes.data)
-            ? acoes.data
-            : ((acoes.data as any)?.available_actions ?? (acoes.data as any)?.results ?? [])
-        )
-          .map((a: any) => (typeof a === "string" ? a : (a?.action ?? a?.name ?? a?.id)))
-          .filter(Boolean);
+        const detalhe = c.players
+          ? { data: c }
+          : await mlFetch(conta, `/post-purchase/v1/claims/${c.id}`, { actor: ator });
+        const lista = acoesDaConta(detalhe.data, conta.ml_user_id);
 
         reclamacoes.push({
           id: String(c.id),
@@ -1567,6 +1563,83 @@ export const adminMlAoVivo = createServerFn({ method: "GET" })
   });
 
 /**
+ * Ações que o Mercado Livre liberou para ESTA conta numa reclamação.
+ *
+ * Elas vêm no próprio GET /claims/{id}, em players[].available_actions — um
+ * jogador por papel (quem reclama, quem responde, mediador). Pegamos só o da
+ * conta, para nunca oferecer a ação que pertence à outra parte.
+ */
+function acoesDaConta(claim: any, mlUserId: string): string[] {
+  const jogadores: any[] = Array.isArray(claim?.players) ? claim.players : [];
+  const eu = jogadores.find((p) => String(p?.user_id ?? "") === String(mlUserId));
+  return ((eu?.available_actions ?? []) as any[])
+    .map((a) => (typeof a === "string" ? a : a?.action))
+    .filter(Boolean);
+}
+
+/**
+ * Lê uma reclamação. O GET /claims/{id} responde 403 ("User does not have
+ * access to claim") para conta de comprador, mas a busca devolve o mesmo
+ * objeto, com players e ações — então caímos nela quando o detalhe é negado.
+ */
+async function lerReclamacao(conta: any, claimId: string, ator: string) {
+  const { mlFetch } = await import("./server/ml-api.server");
+  const detalhe = await mlFetch(conta, `/post-purchase/v1/claims/${claimId}`, { actor: ator });
+  if (detalhe.ok) return detalhe;
+
+  const buscas = await Promise.all(
+    ["claim", "dispute"].map((stage) =>
+      mlFetch(conta, `/post-purchase/v1/claims/search?stage=${stage}`, { actor: ator }),
+    ),
+  );
+  const achada = buscas
+    .flatMap((r) => ((r.data as any)?.data ?? []) as any[])
+    .find((c) => String(c?.id ?? "") === String(claimId));
+  return achada ? { ...detalhe, ok: true, data: achada, error: undefined } : detalhe;
+}
+
+/**
+ * Endereço e corpo de cada ação, como a documentação do ML descreve
+ * (developers.mercadolivre.com.br, "Gerenciar resolução de reclamações").
+ * O nome da ação NÃO é o caminho: reembolso e devolução ficam em
+ * /expected-resolutions, mediação e mensagem em /actions.
+ *
+ * Ação fora desta lista não é adivinhada — devolve null e quem chama recusa.
+ */
+function rotaDaAcao(
+  acao: string,
+  claimId: string,
+  texto: string,
+  percentual: number | null,
+): { path: string; body: unknown } | { erro: string } | null {
+  const base = `/post-purchase/v1/claims/${claimId}`;
+
+  const mensagem = /^send_message_to_(complainant|respondent|mediator)$/.exec(acao);
+  if (mensagem) {
+    if (!texto) return { erro: "Escreva a mensagem antes de enviar." };
+    return { path: `${base}/actions/send-message`, body: { receiver_role: mensagem[1], message: texto } };
+  }
+
+  switch (acao) {
+    case "refund":
+      return { path: `${base}/expected-resolutions/refund`, body: {} };
+    case "allow_return":
+    case "allow_return_label":
+      return { path: `${base}/expected-resolutions/allow-return`, body: {} };
+    case "allow_partial_refund":
+      // O ML não aceita 100% por aqui — reembolso total é a ação "refund".
+      if (percentual == null || !(percentual > 0 && percentual < 100)) {
+        return { erro: "Informe um percentual entre 1 e 99 para o reembolso parcial." };
+      }
+      return { path: `${base}/expected-resolutions/partial-refund`, body: { percentage: percentual } };
+    case "open_dispute":
+      return { path: `${base}/actions/open-dispute`, body: {} };
+    default:
+      return null;
+  }
+}
+
+/**
  * Reclamações (claims) da conta.
  *
  * CONSULTAR funciona: GET /post-purchase/v1/claims/search?stage=claim  -> 200
@@ -1574,7 +1647,8 @@ export const adminMlAoVivo = createServerFn({ method: "GET" })
  *   /post-purchase/v1/claims/reasons        404
  *   /post-purchase/v1/orders/{id}/actions   404
  *   /marketplace/claims/search              404
- * O Mercado Livre só permite abrir reclamação pelo site/app dele.
+ * e a documentação do ML (out/2026) só tem consulta e resolução. Quem abre é o
+ * comprador, pelo site/app. ENCERRAR tem caminho: ver rotaDaAcao.
  */
 export const adminReclamacoes = createServerFn({ method: "GET" })
   .middleware([requireAdminUser])
@@ -1606,7 +1680,7 @@ export const adminReclamacoes = createServerFn({ method: "GET" })
       emAndamento: { ok: emAndamento.ok, total: (emAndamento.data as any)?.paging?.total ?? 0, itens: mapear(emAndamento), erro: emAndamento.error },
       encerradas: { ok: encerradas.ok, total: (encerradas.data as any)?.paging?.total ?? 0, itens: mapear(encerradas), erro: encerradas.error },
       aviso:
-        "Abrir e encerrar reclamação não têm endpoint público na API do Mercado Livre — isso é feito no site/app deles. Aqui você acompanha o andamento.",
+        "Abrir reclamação não tem endpoint na API do Mercado Livre — só o comprador abre, pelo site/app. Encerrar dá por aqui: abra a reclamação e use reembolso, devolução ou mediação, conforme o ML liberar para esta conta.",
     };
   });
 
@@ -1629,21 +1703,18 @@ export const adminReclamacaoDetalhe = createServerFn({ method: "GET" })
     const conta = await getAccount(data.accountId);
     const ator = `centralml:${context.user.email}`;
 
-    /* Quatro consultas: as duas últimas são os caminhos que levam ao
-     * encerramento. Confirmei por teste que ambas as rotas existem
-     * (respondem "Claim not found" para id inexistente, não "resource not
-     * found"). Qual delas o Mercado Livre oferece depende da reclamação. */
-    const [detalhe, mensagens, acoes, resolucoes] = await Promise.all([
-      mlFetch(conta, `/post-purchase/v1/claims/${data.claimId}`, { actor: ator }),
+    /* As ações vêm dentro do próprio detalhe (players[].available_actions);
+     * as resoluções esperadas mostram o que cada parte pediu/ofereceu. */
+    const [detalhe, mensagens, resolucoes] = await Promise.all([
+      lerReclamacao(conta, data.claimId, ator),
       mlFetch(conta, `/post-purchase/v1/claims/${data.claimId}/messages`, { actor: ator }),
-      mlFetch(conta, `/post-purchase/v1/claims/${data.claimId}/actions`, { actor: ator }),
       mlFetch(conta, `/post-purchase/v1/claims/${data.claimId}/expected-resolutions`, { actor: ator }),
     ]);
 
     const d: any = detalhe.data ?? {};
-    const listaAcoes = Array.isArray(acoes.data)
-      ? (acoes.data as any[])
-      : ((acoes.data as any)?.available_actions ?? (acoes.data as any)?.actions ?? []);
+    const minhas = acoesDaConta(d, conta.ml_user_id);
+    const meuPapel =
+      ((d.players ?? []) as any[]).find((p) => String(p?.user_id ?? "") === String(conta.ml_user_id))?.role ?? null;
 
     return {
       ok: detalhe.ok,
@@ -1665,10 +1736,11 @@ export const adminReclamacaoDetalhe = createServerFn({ method: "GET" })
       mensagens: Array.isArray(mensagens.data) ? mensagens.data : ((mensagens.data as any)?.messages ?? []),
 
       // Nomes vindos do próprio ML — a interface só mostra o que ele permitir.
-      acoesDisponiveis: (listaAcoes ?? [])
-        .map((x: any) => (typeof x === "string" ? x : x?.action ?? x?.name ?? x?.id))
-        .filter(Boolean),
-      avisoAcoes: acoes.ok ? null : `Ações: HTTP ${acoes.status}. ${acoes.error ?? ""}`,
+      acoesDisponiveis: minhas,
+      meuPapel,
+      avisoAcoes: meuPapel
+        ? null
+        : `Esta conta (${conta.ml_user_id}) não aparece entre as partes da reclamação.`,
 
       /* Resoluções esperadas — é por aqui que normalmente se encerra
        * (devolver, reembolsar, chegar a acordo). O formato varia, então
@@ -1682,7 +1754,7 @@ export const adminReclamacaoDetalhe = createServerFn({ method: "GET" })
 
       /* Resposta crua das duas consultas de ação. Se o formato vier diferente
        * do previsto, o operador ainda enxerga tudo em vez de ver a tela vazia. */
-      bruto: { acoes: acoes.data ?? null, resolucoes: resolucoes.data ?? null },
+      bruto: { partes: d.players ?? null, resolucoes: resolucoes.data ?? null },
     };
   });
 
@@ -1695,12 +1767,15 @@ export const adminReclamacaoDetalhe = createServerFn({ method: "GET" })
  */
 export const adminReclamacaoAcao = createServerFn({ method: "POST" })
   .middleware([requireAdminUser])
-  .inputValidator((input: { accountId: string; claimId: string; acao: string; texto?: string }) => ({
-    accountId: String(input.accountId),
-    claimId: String(input.claimId),
-    acao: String(input.acao ?? "").trim().slice(0, 60),
-    texto: String(input.texto ?? "").trim().slice(0, 2000),
-  }))
+  .inputValidator(
+    (input: { accountId: string; claimId: string; acao: string; texto?: string; percentual?: number | null }) => ({
+      accountId: String(input.accountId),
+      claimId: String(input.claimId),
+      acao: String(input.acao ?? "").trim().slice(0, 60),
+      texto: String(input.texto ?? "").trim().slice(0, 2000),
+      percentual: input.percentual == null || input.percentual === ("" as any) ? null : Number(input.percentual),
+    }),
+  )
   .handler(async ({ data, context }) => {
     if (!data.acao) throw new Error("Escolha uma ação.");
     await requireOwnedAccount(context.user, data.accountId);
@@ -1710,21 +1785,28 @@ export const adminReclamacaoAcao = createServerFn({ method: "POST" })
     const conta = await getAccount(data.accountId);
     const ator = `centralml:${context.user.email}`;
 
-    // Confere na hora que a ação está mesmo disponível.
-    const acoes = await mlFetch(conta, `/post-purchase/v1/claims/${data.claimId}/actions`, { actor: ator });
-    const lista = (Array.isArray(acoes.data) ? acoes.data : ((acoes.data as any)?.available_actions ?? []))
-      .map((x: any) => (typeof x === "string" ? x : x?.action ?? x?.name))
-      .filter(Boolean);
+    // Confere na hora que a ação está mesmo liberada para esta conta.
+    const detalhe = await lerReclamacao(conta, data.claimId, ator);
+    if (!detalhe.ok) throw new Error(`Não foi possível ler a reclamação (${detalhe.error ?? detalhe.status}).`);
+    const lista = acoesDaConta(detalhe.data, conta.ml_user_id);
 
-    if (lista.length && !lista.includes(data.acao)) {
+    if (!lista.includes(data.acao)) {
       throw new Error(
         `O Mercado Livre não permite “${data.acao}” nesta reclamação agora. Disponíveis: ${lista.join(", ") || "nenhuma"}.`,
       );
     }
 
-    const res = await mlFetch(conta, `/post-purchase/v1/claims/${data.claimId}/actions/${data.acao}`, {
+    const rota = rotaDaAcao(data.acao, data.claimId, data.texto, data.percentual);
+    if (!rota) {
+      throw new Error(
+        `A ação “${data.acao}” ainda não é executada por esta tela. Use o API Console com a documentação do Mercado Livre.`,
+      );
+    }
+    if ("erro" in rota) throw new Error(rota.erro);
+
+    const res = await mlFetch(conta, rota.path, {
       method: "POST",
-      body: JSON.stringify(data.texto ? { message: data.texto } : {}),
+      body: JSON.stringify(rota.body),
       actor: ator,
     });
 
@@ -1737,7 +1819,7 @@ export const adminReclamacaoAcao = createServerFn({ method: "POST" })
       entityId: data.claimId,
       accountId: data.accountId,
       success: res.ok,
-      detail: { claim_id: data.claimId, acao: data.acao, http_status: res.status },
+      detail: { claim_id: data.claimId, acao: data.acao, percentual: data.percentual, http_status: res.status },
     });
 
     if (!res.ok) throw new Error(`O Mercado Livre recusou a ação (${res.error ?? res.status}).`);
