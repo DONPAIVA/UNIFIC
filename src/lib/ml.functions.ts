@@ -12,11 +12,12 @@ import { PREFIXO_STATE_PUBLICO } from "./ml-oauth";
 export const startMlConnect = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .handler(async ({ context }) => {
-    const { getMlCredentials, getMlRedirectUri, isPkceEnabled } = await import("./server/config.server");
+    const { getMlRedirectUri, isPkceEnabled } = await import("./server/config.server");
     const { ML_AUTH_URL } = await import("./server/ml-api.server");
     const { db } = await import("./server/db.server");
+    const { appAtivo, gravarStateOAuth } = await import("./server/ml-apps.server");
 
-    const { clientId } = getMlCredentials();
+    const { clientId } = await appAtivo();
     const redirectUri = getMlRedirectUri();
 
     const state = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
@@ -26,13 +27,16 @@ export const startMlConnect = createServerFn({ method: "POST" })
     // O dono sai da SESSÃO validada no servidor, nunca de um campo do formulário.
     const ownerUserId = context.user.userId;
 
-    const { error } = await db("ml_oauth_states").insert({
-      state,
-      code_verifier: codeVerifier,
-      owner_user_id: ownerUserId,
-      redirect_uri: redirectUri,
-      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-    });
+    const { error } = await gravarStateOAuth(
+      {
+        state,
+        code_verifier: codeVerifier,
+        owner_user_id: ownerUserId,
+        redirect_uri: redirectUri,
+        expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      },
+      clientId,
+    );
     if (error) throw new Error("Não foi possível iniciar a conexão. Tente novamente.");
 
     // Limpeza oportunista dos states expirados (sem job externo).
@@ -76,11 +80,12 @@ export const startMlConnect = createServerFn({ method: "POST" })
  * Mercado Livre, e o token continua saindo apenas do backend.
  */
 export const startMlConnectPublico = createServerFn({ method: "POST" }).handler(async () => {
-  const { getMlCredentials, getMlRedirectUri, isPkceEnabled } = await import("./server/config.server");
+  const { getMlRedirectUri, isPkceEnabled } = await import("./server/config.server");
   const { ML_AUTH_URL } = await import("./server/ml-api.server");
   const { db } = await import("./server/db.server");
+  const { appAtivo, gravarStateOAuth } = await import("./server/ml-apps.server");
 
-  const { clientId } = getMlCredentials();
+  const { clientId } = await appAtivo();
   const redirectUri = getMlRedirectUri();
 
   const state =
@@ -92,13 +97,16 @@ export const startMlConnectPublico = createServerFn({ method: "POST" }).handler(
 
   // owner_user_id fica NULO: ainda não existe cliente. Quem preenche é o
   // callback, depois de saber qual conta do Mercado Livre autorizou.
-  const { error } = await db("ml_oauth_states").insert({
-    state,
-    code_verifier: codeVerifier,
-    owner_user_id: null,
-    redirect_uri: redirectUri,
-    expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-  });
+  const { error } = await gravarStateOAuth(
+    {
+      state,
+      code_verifier: codeVerifier,
+      owner_user_id: null,
+      redirect_uri: redirectUri,
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    },
+    clientId,
+  );
   if (error) throw new Error("Não foi possível iniciar a conexão. Tente novamente.");
 
   await db("ml_oauth_states").delete().lt("expires_at", new Date().toISOString());

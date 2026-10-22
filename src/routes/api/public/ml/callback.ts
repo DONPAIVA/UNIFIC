@@ -106,15 +106,13 @@ async function tratarCallback(request: Request): Promise<Response> {
         });
 
         const { db } = await import("@/lib/server/db.server");
-        const { getMlCredentials, getMlRedirectUri } = await import("@/lib/server/config.server");
+        const { getMlRedirectUri } = await import("@/lib/server/config.server");
         const { ML_API } = await import("@/lib/server/ml-api.server");
         const { logAudit } = await import("@/lib/server/audit.server");
+        const { appAtivo, appDaConta, faltaEsquema } = await import("@/lib/server/ml-apps.server");
 
-        let clientId: string;
-        let clientSecret: string;
         let redirectUri: string;
         try {
-          ({ clientId, clientSecret } = getMlCredentials());
           redirectUri = getMlRedirectUri();
         } catch {
           return back("Integração do Mercado Livre não configurada.");
@@ -126,10 +124,9 @@ async function tratarCallback(request: Request): Promise<Response> {
         // O DELETE ... .select() é atômico no Postgres: se duas requisições
         // chegarem com o mesmo state, só uma recebe a linha de volta —
         // é isso que impede o replay do authorization code.
-        const { data: consumed } = await db("ml_oauth_states")
-          .delete()
-          .eq("state", state)
-          .select("state, code_verifier, owner_user_id, redirect_uri, expires_at");
+        // select("*"): inclui app_client_id quando a coluna existe, sem quebrar
+        // antes de o SQL dela ser rodado.
+        const { data: consumed } = await db("ml_oauth_states").delete().eq("state", state).select("*");
 
         const st = Array.isArray(consumed) ? consumed[0] : consumed;
         if (!st) {
@@ -149,6 +146,16 @@ async function tratarCallback(request: Request): Promise<Response> {
             error: "State expirado.",
           });
           return back("Sessão de autorização expirada. Tente novamente.");
+        }
+
+        // O code só troca pelo MESMO app que pediu a autorização — se o app
+        // ativo mudou no meio do caminho, vale o que foi gravado no state.
+        let clientId: string;
+        let clientSecret: string;
+        try {
+          ({ clientId, clientSecret } = st.app_client_id ? await appDaConta(st.app_client_id) : await appAtivo());
+        } catch {
+          return back("Integração do Mercado Livre não configurada.");
         }
 
         const body = new URLSearchParams({
@@ -272,30 +279,33 @@ async function tratarCallback(request: Request): Promise<Response> {
           return back("Esta conta do Mercado Livre já está conectada em outro cadastro do Unific+.");
         }
 
-        const { data: saved, error: saveError } = await db("ml_connections")
-          .upsert(
-            {
-              provider: "mercado_livre",
-              ml_user_id: mlUserId,
-              nickname: me.nickname ?? null,
-              email: me.email ?? null,
-              first_name: me.first_name ?? null,
-              site_id: me.site_id ?? null,
-              owner_user_id: ownerUserId,
-              access_token: tok.access_token,
-              refresh_token: tok.refresh_token ?? null,
-              scope: tok.scope ?? null,
-              status: "active",
-              last_error: null,
-              reauth_required_at: null,
-              last_activity_at: new Date().toISOString(),
-              expires_at: new Date(Date.now() + (tok.expires_in ?? 21600) * 1000).toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "provider,ml_user_id" },
-          )
-          .select("id")
-          .maybeSingle();
+        const linhaConexao = {
+          provider: "mercado_livre",
+          ml_user_id: mlUserId,
+          nickname: me.nickname ?? null,
+          email: me.email ?? null,
+          first_name: me.first_name ?? null,
+          site_id: me.site_id ?? null,
+          owner_user_id: ownerUserId,
+          access_token: tok.access_token,
+          refresh_token: tok.refresh_token ?? null,
+          scope: tok.scope ?? null,
+          status: "active",
+          last_error: null,
+          reauth_required_at: null,
+          last_activity_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + (tok.expires_in ?? 21600) * 1000).toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        const salvarConexao = (linha: Record<string, unknown>) =>
+          db("ml_connections").upsert(linha, { onConflict: "provider,ml_user_id" }).select("id").maybeSingle();
+
+        // Grava com qual app a conta foi autorizada — a renovação depende
+        // disso. Sem a coluna (SQL ainda não rodado), salva sem ela.
+        let { data: saved, error: saveError } = await salvarConexao({ ...linhaConexao, app_client_id: clientId });
+        if (saveError && faltaEsquema(saveError, "app_client_id")) {
+          ({ data: saved, error: saveError } = await salvarConexao(linhaConexao));
+        }
 
         if (saveError) {
           console.error("[ml/callback] falha ao salvar conexão", saveError.message);

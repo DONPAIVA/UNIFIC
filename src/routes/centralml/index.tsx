@@ -66,6 +66,7 @@ import {
 import { adminBloquearCliente, adminClientes, adminRevelarCpf } from "@/lib/perfil.functions";
 import { adminAoVivo, adminBloquearIp, adminIpsBloqueados, registrarTentativaPainel } from "@/lib/monitor.functions";
 import mlLogo from "@/assets/ml-logo.png";
+import { adminAppsMl, adminAtivarAppMl, adminRemoverAppMl, adminSalvarAppMl } from "@/lib/apps-ml.functions";
 import { formatarCpf, formatarTelefone, mascararCpf } from "@/lib/cpf";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -4829,6 +4830,8 @@ function ConfiguracoesTab({ isAdmin }: { isAdmin: boolean }) {
 
       <SegundoFatorPainel />
 
+      <AplicativoMlPainel />
+
       <DiagnosticoOAuth />
 
       <Panel title="Integração Mercado Livre">
@@ -4899,6 +4902,290 @@ function ConfiguracoesTab({ isAdmin }: { isAdmin: boolean }) {
         )}
       </Panel>
     </>
+  );
+}
+
+/**
+ * Aplicativo do Mercado Livre usado pelo Únific+.
+ *
+ * Para trocar de app: cola o Client ID e o Secret do app novo, o servidor
+ * testa no próprio ML e, se aceitar, deixa como o ativo. As contas já
+ * conectadas seguem renovando pelo app que as autorizou — ninguém cai.
+ */
+function AplicativoMlPainel() {
+  const { data, loading, error, reload } = useAsync(["apps-ml"], () => adminAppsMl());
+  const [form, setForm] = useState({ clientId: "", clientSecret: "", nome: "" });
+  const [verSecret, setVerSecret] = useState(false);
+  const [ocupado, setOcupado] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [copiado, setCopiado] = useState<string | null>(null);
+
+  const copiar = async (rotulo: string, valor: string) => {
+    try {
+      await navigator.clipboard.writeText(valor);
+      setCopiado(rotulo);
+      window.setTimeout(() => setCopiado(null), 1500);
+    } catch {
+      /* sem permissão de área de transferência: o texto continua na tela */
+    }
+  };
+
+  const executar = async (chave: string, acao: () => Promise<string>) => {
+    setOcupado(chave);
+    setAviso(null);
+    try {
+      setAviso({ ok: true, msg: await acao() });
+      reload();
+    } catch (e) {
+      setAviso({ ok: false, msg: errorMessage(e) });
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  const salvar = () => {
+    if (
+      !confirm(
+        "Testar este app no Mercado Livre e deixar como o ativo?\n\nAs contas já conectadas continuam funcionando pelo app delas. Só as conexões novas usam este.",
+      )
+    )
+      return;
+    void executar("salvar", async () => {
+      const r = await adminSalvarAppMl({ data: form });
+      setForm({ clientId: "", clientSecret: "", nome: "" });
+      return `${r.mensagem} App ativado: as próximas conexões já usam ele.`;
+    });
+  };
+
+  const ativar = (clientId: string) => {
+    if (!confirm(`Deixar o app ${clientId} como o ativo?\n\nAs conexões novas passam a usar ele.`)) return;
+    void executar(`ativar:${clientId}`, async () => {
+      await adminAtivarAppMl({ data: { clientId } });
+      return `App ${clientId} ativado.`;
+    });
+  };
+
+  const remover = (clientId: string) => {
+    if (!confirm(`Remover o app ${clientId} da Central?`)) return;
+    void executar(`remover:${clientId}`, async () => {
+      await adminRemoverAppMl({ data: { clientId } });
+      return `App ${clientId} removido.`;
+    });
+  };
+
+  if (loading) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  if (!data) return null;
+
+  // Uma lista só: o app do .env (se não estiver cadastrado) e os da Central.
+  const linhas = [
+    ...(data.env && !data.env.cadastradoNaCentral
+      ? [{ clientId: data.env.clientId, nome: "App do servidor (.env)", origem: "env" as const, contas: data.env.contas }]
+      : []),
+    ...data.apps.map((a) => ({ clientId: a.clientId, nome: a.nome, origem: "painel" as const, contas: a.contas })),
+  ];
+
+  const enderecos = [
+    { rotulo: "Redirect URI", valor: data.redirectUri },
+    { rotulo: "URL de notificações", valor: data.webhookUrl },
+  ];
+
+  return (
+    <Panel title="Aplicativo do Mercado Livre">
+      {aviso && (
+        <p
+          className={`mb-4 rounded-lg px-3 py-2 text-sm font-semibold ${
+            aviso.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"
+          }`}
+        >
+          {aviso.msg}
+        </p>
+      )}
+
+      {/* App ativo em destaque */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-[#FFE600] bg-[#FFFBE0] p-4">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#1F5FD4] text-[#FFE600]">
+          <Key className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">App ativo</p>
+          <p className="truncate font-mono text-lg font-black text-[#1F5FD4]">{data.ativo?.clientId ?? "nenhum"}</p>
+          <p className="text-xs font-semibold text-zinc-600">
+            {data.ativo
+              ? data.ativo.origem === "painel"
+                ? "Cadastrado aqui na Central. As conexões novas usam este app."
+                : "Vem do .env do servidor. As conexões novas usam este app."
+              : "Nenhum app configurado: ninguém consegue conectar o Mercado Livre."}
+          </p>
+        </div>
+      </div>
+
+      {data.semTabela && (
+        <p className="mt-4 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Para cadastrar e trocar o app por aqui, rode uma vez no Supabase o arquivo{" "}
+            <code className="font-bold">supabase/migrations/20261022120000_apps_do_mercado_livre.sql</code>. Até lá, o
+            app do <code>.env</code> continua valendo normalmente.
+          </span>
+        </p>
+      )}
+
+      {/* Apps conhecidos */}
+      {linhas.length > 0 && (
+        <div className="mt-4">
+          <Table head={["App", "Origem", "Contas", ""]}>
+            {linhas.map((l) => {
+              const ehAtivo = data.ativo?.clientId === l.clientId;
+              return (
+                <tr key={l.clientId}>
+                  <td className="px-2 py-2">
+                    <p className="font-mono text-sm font-bold text-[#1F5FD4]">{l.clientId}</p>
+                    {l.nome && <p className="text-[11px] text-zinc-500">{l.nome}</p>}
+                  </td>
+                  <td className="px-2 py-2 text-xs font-semibold text-zinc-700">
+                    {l.origem === "env" ? ".env do servidor" : "Central"}
+                  </td>
+                  <td className="px-2 py-2 text-sm font-bold tabular-nums text-zinc-800">{l.contas}</td>
+                  <td className="px-2 py-2 text-right">
+                    {ehAtivo ? (
+                      <Badge className="border-[#1F5FD4] bg-[#1F5FD4] text-white">ATIVO</Badge>
+                    ) : (
+                      <span className="inline-flex gap-1.5">
+                        <button
+                          onClick={() => ativar(l.clientId)}
+                          disabled={ocupado !== null || data.semTabela}
+                          className="rounded-md bg-[#FFE600] px-2.5 py-1 text-[11px] font-black uppercase text-[#1F5FD4] hover:brightness-95 disabled:opacity-50"
+                        >
+                          Ativar
+                        </button>
+                        {l.origem === "painel" && (
+                          <button
+                            onClick={() => remover(l.clientId)}
+                            disabled={ocupado !== null}
+                            className="rounded-md bg-zinc-200 px-2.5 py-1 text-[11px] font-bold text-zinc-700 hover:bg-zinc-300 disabled:opacity-50"
+                          >
+                            Remover
+                          </button>
+                        )}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </Table>
+          <p className="mt-2 text-[11px] text-zinc-600">
+            “Contas” = quantas contas foram autorizadas por aquele app e renovam o login por ele.
+          </p>
+        </div>
+      )}
+
+      {/* Trocar de app, em três passos */}
+      <div className="mt-6 space-y-4">
+        <h3 className="text-xs font-black uppercase tracking-wide text-[#1F5FD4]">Trocar de app</h3>
+
+        <div className="flex gap-3">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1F5FD4] text-xs font-black text-[#FFE600]">
+            1
+          </span>
+          <div className="min-w-0 flex-1 text-sm text-zinc-700">
+            <p>
+              No{" "}
+              <a
+                href="https://developers.mercadolivre.com.br/devcenter"
+                target="_blank"
+                rel="noreferrer"
+                className="font-bold text-[#1F5FD4] underline"
+              >
+                DevCenter do Mercado Livre
+              </a>
+              , crie o app novo com <strong>todas as permissões em leitura e escrita</strong> e cole estes endereços:
+            </p>
+            <div className="mt-2 space-y-2">
+              {enderecos.map((e) => (
+                <div key={e.rotulo} className="flex min-w-0 items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2">
+                  <span className="w-36 shrink-0 text-[11px] font-black uppercase text-zinc-500">{e.rotulo}</span>
+                  <code className="min-w-0 flex-1 truncate font-mono text-xs text-zinc-800">{e.valor || "—"}</code>
+                  <button
+                    onClick={() => void copiar(e.rotulo, e.valor)}
+                    disabled={!e.valor}
+                    className="flex shrink-0 items-center gap-1 rounded-md bg-[#1F5FD4] px-2 py-1 text-[11px] font-bold text-white hover:bg-[#1A4FB0] disabled:opacity-50"
+                  >
+                    {copiado === e.rotulo ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiado === e.rotulo ? "Copiado" : "Copiar"}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-600">
+              Nas notificações, marque os mesmos tópicos do app atual. Abra pelo domínio de produção para que a Redirect
+              URI acima saia com ele.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1F5FD4] text-xs font-black text-[#FFE600]">
+            2
+          </span>
+          <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
+            <input
+              value={form.clientId}
+              onChange={(e) => setForm({ ...form, clientId: e.target.value.replace(/\D/g, "") })}
+              inputMode="numeric"
+              placeholder="Client ID (só números)"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 outline-none focus:border-[#1F5FD4] focus:ring-2 focus:ring-[#FFE600]"
+            />
+            <div className="relative">
+              <input
+                value={form.clientSecret}
+                onChange={(e) => setForm({ ...form, clientSecret: e.target.value })}
+                type={verSecret ? "text" : "password"}
+                autoComplete="off"
+                placeholder="Client Secret"
+                className="w-full rounded-lg border border-zinc-300 bg-white py-2 pl-3 pr-10 font-mono text-sm text-zinc-900 outline-none focus:border-[#1F5FD4] focus:ring-2 focus:ring-[#FFE600]"
+              />
+              <button
+                onClick={() => setVerSecret((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 hover:text-zinc-800"
+                aria-label={verSecret ? "Esconder secret" : "Mostrar secret"}
+                type="button"
+              >
+                {verSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <input
+              value={form.nome}
+              onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              placeholder="Nome para lembrar (opcional)"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-[#1F5FD4] focus:ring-2 focus:ring-[#FFE600] sm:col-span-2"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1F5FD4] text-xs font-black text-[#FFE600]">
+            3
+          </span>
+          <div className="min-w-0 flex-1">
+            <button
+              onClick={salvar}
+              disabled={ocupado !== null || data.semTabela || !form.clientId || !form.clientSecret}
+              className="flex items-center gap-2 rounded-lg bg-[#FFE600] px-4 py-2.5 text-sm font-black uppercase tracking-wide text-[#1F5FD4] shadow-sm hover:brightness-95 disabled:opacity-50"
+            >
+              {ocupado === "salvar" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+              Testar no ML e ativar
+            </button>
+            <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">
+              O painel confere o Client ID e o Secret no próprio Mercado Livre antes de salvar. O Secret fica guardado
+              cifrado e nunca volta para a tela. As contas já conectadas continuam funcionando pelo app delas; para
+              passar uma conta para o app novo, o cliente conecta o Mercado Livre de novo pelo Únific+.
+            </p>
+          </div>
+        </div>
+      </div>
+    </Panel>
   );
 }
 

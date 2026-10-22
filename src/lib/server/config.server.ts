@@ -110,14 +110,8 @@ export function getMlWebhookUrl(): string {
   return base ? `${base}${ML_WEBHOOK_PATH}` : ML_WEBHOOK_PATH;
 }
 
-export function getMlCredentials(): { clientId: string; clientSecret: string } {
-  const clientId = env("ML_CLIENT_ID");
-  const clientSecret = env("ML_CLIENT_SECRET");
-  if (!clientId || !clientSecret) {
-    throw new Error("Integração do Mercado Livre não configurada (ML_CLIENT_ID / ML_CLIENT_SECRET).");
-  }
-  return { clientId, clientSecret };
-}
+// Client ID / Secret: ver ml-apps.server.ts — o app ativo pode vir da Central
+// e cada conta renova pelo app que a autorizou; o .env é o padrão.
 
 export function isPkceEnabled(): boolean {
   return env("ML_USE_PKCE").toLowerCase() === "on";

@@ -1348,7 +1348,11 @@ export const adminMlAoVivo = createServerFn({ method: "GET" })
       return { ok: r.ok, status: r.status, dados: r.data, erro: r.error };
     };
 
-    const appId = (process.env["ML_CLIENT_ID"] ?? "").trim();
+    // O app que autorizou ESTA conta (pode não ser o ativo, depois de uma troca).
+    const { appDaConta } = await import("./server/ml-apps.server");
+    const appId = await appDaConta(conta.app_client_id)
+      .then((a) => a.clientId)
+      .catch(() => "");
 
     // Em paralelo: a latência da API do ML soma rápido em série.
     // Cada endpoint abaixo foi testado com token real e devolveu HTTP 200.
@@ -1858,11 +1862,12 @@ export const adminRevogarAutorizacao = createServerFn({ method: "POST" })
 
     const { db } = await import("./server/db.server");
     const { getAccount, revogarAutorizacao } = await import("./server/ml-api.server");
-    const { getMlCredentials } = await import("./server/config.server");
+    const { appDaConta } = await import("./server/ml-apps.server");
     const { logAudit } = await import("./server/audit.server");
 
     const conta = await getAccount(data.accountId);
-    const { clientId } = getMlCredentials();
+    // Revoga o app que de fato autorizou esta conta.
+    const { clientId } = await appDaConta(conta.app_client_id);
 
     const res = await revogarAutorizacao(conta, clientId);
 

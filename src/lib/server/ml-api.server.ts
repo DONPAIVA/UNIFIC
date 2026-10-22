@@ -4,7 +4,7 @@
  * Tokens NUNCA saem do servidor: leitura, refresh e uso acontecem só aqui.
  */
 import { db } from "./db.server";
-import { getMlCredentials } from "./config.server";
+import { appDaConta } from "./ml-apps.server";
 
 export const ML_API = "https://api.mercadolibre.com";
 export const ML_AUTH_URL = "https://auth.mercadolivre.com.br/authorization";
@@ -21,6 +21,8 @@ export type MlAccount = {
   site_id: string | null;
   /** Permissões concedidas na autorização (não é segredo). */
   scope?: string | null;
+  /** App do ML que autorizou a conta (ver ml-apps.server). Nulo = app do .env. */
+  app_client_id?: string | null;
 };
 
 /**
@@ -154,10 +156,11 @@ export async function tentarRenovar(
     };
   }
 
+  // O token só renova pelo MESMO app que o emitiu.
   let clientId: string;
   let clientSecret: string;
   try {
-    ({ clientId, clientSecret } = getMlCredentials());
+    ({ clientId, clientSecret } = await appDaConta(account.app_client_id));
   } catch (e) {
     return {
       ok: false,

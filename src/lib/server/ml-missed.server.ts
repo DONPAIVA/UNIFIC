@@ -54,7 +54,10 @@ export async function recuperarNotificacoesPerdidas(
   const limite = Math.min(Math.max(opts.limite ?? 50, 1), 200);
   const origem = opts.origem ?? "recuperacao";
   const { logEvent } = await import("./logs.server");
-  const appId = (process.env["ML_CLIENT_ID"] ?? "").trim();
+  const { appAtivo } = await import("./ml-apps.server");
+  const appId = await appAtivo()
+    .then((a) => a.clientId)
+    .catch(() => "");
 
   const vazio: ResultadoRecuperacao = {
     lidas: 0,

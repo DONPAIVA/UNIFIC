@@ -14,7 +14,8 @@ export const Route = createFileRoute("/api/public/ml/connect")({
   server: {
     handlers: {
       GET: async () => {
-        const { getMlCredentials, getMlRedirectUri, isPkceEnabled } = await import("@/lib/server/config.server");
+        const { getMlRedirectUri, isPkceEnabled } = await import("@/lib/server/config.server");
+        const { appAtivo, gravarStateOAuth } = await import("@/lib/server/ml-apps.server");
         const { ML_AUTH_URL } = await import("@/lib/server/ml-api.server");
         const { db } = await import("@/lib/server/db.server");
         const { resolveRequester } = await import("@/lib/server/auth.server");
@@ -47,7 +48,7 @@ export const Route = createFileRoute("/api/public/ml/connect")({
         let clientId: string;
         let redirectUri: string;
         try {
-          ({ clientId } = getMlCredentials());
+          ({ clientId } = await appAtivo());
           redirectUri = getMlRedirectUri();
         } catch (e) {
           return fail(e instanceof Error ? e.message : "Integração não configurada.");
@@ -57,13 +58,16 @@ export const Route = createFileRoute("/api/public/ml/connect")({
         const state = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
         const codeVerifier = isPkceEnabled() ? base64Url(crypto.getRandomValues(new Uint8Array(48))) : null;
 
-        const { error } = await db("ml_oauth_states").insert({
-          state,
-          code_verifier: codeVerifier,
-          owner_user_id: requester.userId,
-          redirect_uri: redirectUri,
-          expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        });
+        const { error } = await gravarStateOAuth(
+          {
+            state,
+            code_verifier: codeVerifier,
+            owner_user_id: requester.userId,
+            redirect_uri: redirectUri,
+            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          },
+          clientId,
+        );
         if (error) return fail("Não foi possível iniciar a conexão.");
 
         // Limpeza oportunista dos states expirados (sem job externo).
