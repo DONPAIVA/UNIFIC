@@ -41,6 +41,7 @@ import {
   ShieldCheck,
   Tag,
   ArrowRight,
+  Check,
   ChevronDown,
   Eye,
   EyeOff,
@@ -764,6 +765,13 @@ function CentralML() {
   /** Conta selecionada — todas as abas filtram por ela quando definida. */
   const [accountId, setAccountId] = useState<string | null>(null);
 
+  // Sem barras de rolagem e escala menor no computador — só enquanto o painel
+  // está aberto (regras em styles.css, classe "centralml").
+  useEffect(() => {
+    document.documentElement.classList.add("centralml");
+    return () => document.documentElement.classList.remove("centralml");
+  }, []);
+
   /** Gaveta de navegação do celular. No computador o menu fica sempre à vista. */
   const [menuAberto, setMenuAberto] = useState(false);
 
@@ -899,7 +907,6 @@ function CentralML() {
   }
 
   const abaAtual = TABS.find((t) => t.id === tab) ?? TABS[0]!;
-  const IconeAtual = abaAtual.icon;
 
   return (
     // Sem fundo próprio: o Matrix (global, em __root.tsx) aparece por trás.
@@ -958,30 +965,21 @@ function CentralML() {
         <aside className="hidden w-60 shrink-0 lg:block">
           {/* Branco como os cartões: sobre o Matrix, fundo sólido é o que
               deixa o menu legível. */}
-          <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
+          {/* Sem altura máxima: o menu inteiro cabe na tela e não precisa de
+              rolagem própria. */}
+          <div className="sticky top-24 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
             <div className="h-1 w-full bg-[#FFE600]" />
-            <div className="max-h-[calc(100vh-7.25rem)] overflow-y-auto p-3">
+            <div className="p-3">
               <Navegacao tab={tab} onPick={irParaAba} />
             </div>
           </div>
         </aside>
 
         <main className="min-w-0 flex-1">
-          {/* Título da seção no mesmo cartão dos números: borda amarela
-              inteira e a barra azul do Mercado Livre à esquerda. */}
-          <div className="mb-4 overflow-hidden rounded-xl border-2 border-[#FFE600] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
-            <div className="flex items-center gap-3 border-l-[6px] border-[#1F5FD4] px-4 py-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#1F5FD4] text-[#FFE600] shadow-sm">
-                <IconeAtual className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-zinc-500">{abaAtual.grupo}</p>
-                <h1 className="truncate text-xl font-black uppercase tracking-wide text-[#1F5FD4] sm:text-2xl">
-                  {abaAtual.label}
-                </h1>
-              </div>
-            </div>
-          </div>
+          {/* O menu já marca a aba atual; o título fica só para leitores de tela. */}
+          <h1 className="sr-only">
+            {abaAtual.grupo} — {abaAtual.label}
+          </h1>
 
           <AccountSelector accountId={accountId} onChange={setAccountId} />
 
@@ -1065,73 +1063,286 @@ function Navegacao({ tab, onPick }: { tab: TabId; onPick: (id: TabId) => void })
 /* Seletor de conta (isolamento por cliente)                                  */
 /* ========================================================================== */
 
+/** Conta que pede atenção: fora do ar no ML ou com o token vencido. */
+function contaPedeAtencao(a: any) {
+  return a.status !== "active" || ["expirado", "reautorizacao", "desconectado"].includes(a.tokenStatus?.state ?? "");
+}
+
+/** Inicial da conta num círculo amarelo — âmbar quando a conta pede atenção. */
+function AvatarConta({ nome, atencao = false, grande = false }: { nome: string; atencao?: boolean; grande?: boolean }) {
+  return (
+    <span
+      className={`relative flex shrink-0 items-center justify-center rounded-full bg-[#FFE600] font-black uppercase text-[#1F5FD4] ${
+        grande ? "h-11 w-11 text-base" : "h-9 w-9 text-sm"
+      }`}
+    >
+      {nome.slice(0, 1)}
+      {atencao && (
+        <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white bg-amber-500" />
+      )}
+    </span>
+  );
+}
+
+type FiltroConta = "todas" | "ok" | "atencao";
+
+/**
+ * Seletor da conta em foco.
+ *
+ * Um cartão que abre um painel próprio em vez do <select> nativo: com 30+
+ * contas, a lista do navegador vira uma coluna de apelidos sem contexto. Aqui
+ * cada linha mostra a inicial, o ID no ML, quantos pedidos tem e o status, e
+ * dá para buscar e filtrar quem precisa de atenção.
+ *
+ * Teclado: setas sobem e descem, Enter escolhe, Esc fecha.
+ */
 function AccountSelector({ accountId, onChange }: { accountId: string | null; onChange: (id: string | null) => void }) {
   const { data, loading, error, reload } = useAsync(["contas"], () => adminAccounts());
-  const accounts = data ?? [];
-  const current = accounts.find((a: any) => a.id === accountId) ?? null;
+  const accounts = (data ?? []) as any[];
+  const current = accounts.find((a) => a.id === accountId) ?? null;
+  const nome = current ? String(current.nickname || current.ml_user_id) : null;
 
-  const nome = current ? current.nickname || current.ml_user_id : null;
+  const [aberto, setAberto] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [filtro, setFiltro] = useState<FiltroConta>("todas");
+  /** Linha destacada pelo teclado. -1 = "Todas as contas". */
+  const [cursor, setCursor] = useState(-1);
+  const caixaRef = useRef<HTMLDivElement>(null);
+  const buscaRef = useRef<HTMLInputElement>(null);
+  const listaRef = useRef<HTMLUListElement>(null);
+
+  const totalAtencao = accounts.filter(contaPedeAtencao).length;
+  const termo = busca.trim().toLowerCase();
+  const visiveis = accounts.filter((a) => {
+    if (filtro === "ok" && contaPedeAtencao(a)) return false;
+    if (filtro === "atencao" && !contaPedeAtencao(a)) return false;
+    if (!termo) return true;
+    return `${a.nickname ?? ""} ${a.ml_user_id ?? ""}`.toLowerCase().includes(termo);
+  });
+
+  const fechar = () => {
+    setAberto(false);
+    setBusca("");
+    setFiltro("todas");
+  };
+  const escolher = (id: string | null) => {
+    onChange(id);
+    fechar();
+  };
+
+  // Ao abrir: cursor na conta atual e foco na busca — só com mouse; no
+  // celular o foco abriria o teclado por cima da lista.
+  useEffect(() => {
+    if (!aberto) return;
+    setCursor(accountId ? accounts.findIndex((a) => a.id === accountId) : -1);
+    const comMouse = window.matchMedia("(pointer: fine)").matches;
+    const t = window.setTimeout(() => comMouse && buscaRef.current?.focus(), 0);
+    const fora = (e: MouseEvent) => {
+      if (!caixaRef.current?.contains(e.target as Node)) fechar();
+    };
+    document.addEventListener("mousedown", fora);
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener("mousedown", fora);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto]);
+
+  // Mantém a linha do cursor visível ao navegar pelo teclado.
+  useEffect(() => {
+    listaRef.current?.querySelector(`[data-linha="${cursor}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [cursor]);
+
+  const onTecla = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") return fechar();
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setCursor((c) => Math.min(c + 1, visiveis.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setCursor((c) => Math.max(c - 1, -1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      escolher(cursor === -1 ? null : (visiveis[cursor]?.id ?? null));
+    }
+  };
+
+  const filtros: Array<{ id: FiltroConta; label: string; total: number }> = [
+    { id: "todas", label: "Todas", total: accounts.length },
+    { id: "ok", label: "Conectadas", total: accounts.length - totalAtencao },
+    { id: "atencao", label: "Atenção", total: totalAtencao },
+  ];
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
-      <div className="h-1 w-full bg-[#FFE600]" />
-      <div className="flex flex-col gap-3 p-3 sm:p-4 md:flex-row md:items-center">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFE600] text-sm font-black uppercase text-[#1F5FD4]">
-            {nome ? String(nome).slice(0, 1) : <Users className="h-4 w-4" />}
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Conta em foco</p>
-            <p className="truncate text-sm font-black text-[#1F5FD4]">
-              {nome ?? `Todas as contas${accounts.length ? ` · ${accounts.length}` : ""}`}
-            </p>
-            {current && (
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                <Badge className={accountStatus(current.status).className}>{accountStatus(current.status).label}</Badge>
-                <Badge
-                  className={`border-transparent ${TOKEN_STATE[current.tokenStatus?.state ?? ""]?.className ?? "bg-zinc-100 text-zinc-700"}`}
-                >
-                  {TOKEN_STATE[current.tokenStatus?.state ?? ""]?.label ?? "—"}
-                </Badge>
-              </div>
+    <div ref={caixaRef} className="relative z-30">
+      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
+        <div className="h-1 w-full bg-[#FFE600]" />
+        <div className="flex items-center gap-2 p-3 sm:p-4">
+          <button
+            onClick={() => (aberto ? fechar() : setAberto(true))}
+            aria-haspopup="listbox"
+            aria-expanded={aberto}
+            className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left"
+          >
+            {nome ? (
+              <AvatarConta nome={nome} atencao={contaPedeAtencao(current)} grande />
+            ) : (
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FFE600] text-[#1F5FD4]">
+                <Users className="h-5 w-5" />
+              </span>
             )}
-          </div>
-        </div>
-
-        {/* min-w-0 + w-full: sem isso o <select> cresce até o nome mais
-            comprido da lista e vaza para fora da tela no celular. */}
-        <div className="flex w-full min-w-0 items-center gap-2 md:w-auto">
-          <div className="relative min-w-0 flex-1 md:w-80 md:flex-none">
-            <select
-              value={accountId ?? ""}
-              onChange={(e) => onChange(e.target.value || null)}
-              className="h-10 w-full min-w-0 cursor-pointer appearance-none truncate rounded-lg border border-zinc-300 bg-white pl-3 pr-9 text-sm font-semibold text-zinc-800 outline-none transition focus:border-[#1F5FD4] focus:ring-2 focus:ring-[#FFE600]"
-              aria-label="Conta em foco"
-            >
-              <option value="">Todas as contas</option>
-              {accounts.map((a: any) => (
-                <option key={a.id} value={a.id}>
-                  {a.nickname || a.ml_user_id} — {accountStatus(a.status).label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#1F5FD4]" />
-          </div>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Conta em foco</span>
+              <span className="block truncate text-[15px] font-black text-[#1F5FD4]">{nome ?? "Todas as contas"}</span>
+              <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                {current ? (
+                  <>
+                    <Badge className={accountStatus(current.status).className}>{accountStatus(current.status).label}</Badge>
+                    <Badge
+                      className={`border-transparent ${TOKEN_STATE[current.tokenStatus?.state ?? ""]?.className ?? "bg-zinc-100 text-zinc-700"}`}
+                    >
+                      {TOKEN_STATE[current.tokenStatus?.state ?? ""]?.label ?? "—"}
+                    </Badge>
+                  </>
+                ) : (
+                  <span className="text-xs font-semibold text-zinc-500">
+                    {accounts.length} contas
+                    {totalAtencao > 0 && <span className="text-amber-600"> · {totalAtencao} pedem atenção</span>}
+                  </span>
+                )}
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#FFE600] px-3 py-2 text-xs font-black uppercase tracking-wide text-[#1F5FD4] transition group-hover:brightness-95">
+              <span className="hidden sm:inline">Trocar</span>
+              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${aberto ? "rotate-180" : ""}`} />
+            </span>
+          </button>
           <button
             onClick={reload}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
             title="Recarregar contas"
             aria-label="Recarregar contas"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
+        {error && <p className="px-4 pb-3 text-xs font-semibold text-red-600">{error}</p>}
+        {!loading && !error && accounts.length === 0 && (
+          <p className="px-4 pb-3 text-xs text-zinc-700">
+            Nenhuma conta autorizou o aplicativo ainda. Assim que um cliente concluir o OAuth no Unific+, ela aparece aqui.
+          </p>
+        )}
       </div>
-      {error && <p className="mt-3 text-xs font-semibold text-red-600">{error}</p>}
-      {!loading && !error && accounts.length === 0 && (
-        <p className="mt-3 text-xs text-zinc-700">
-          Nenhuma conta autorizou o aplicativo ainda. Assim que um cliente concluir o OAuth no Unific+, ela aparece aqui.
-        </p>
+
+      {aberto && (
+        <div
+          onKeyDown={onTecla}
+          className="absolute inset-x-0 top-full mt-2 overflow-hidden rounded-xl border-2 border-[#FFE600] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.6)] animate-in fade-in-0 slide-in-from-top-2 duration-150 md:left-auto md:w-[460px]"
+        >
+          <div className="space-y-2.5 border-b border-zinc-100 bg-[#FFFBE0] p-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#1F5FD4]" />
+              <input
+                ref={buscaRef}
+                value={busca}
+                onChange={(e) => {
+                  setBusca(e.target.value);
+                  setCursor(-1);
+                }}
+                placeholder="Buscar por apelido ou ID…"
+                className="h-10 w-full rounded-lg border border-zinc-300 bg-white pl-9 pr-3 text-sm font-semibold text-zinc-800 outline-none focus:border-[#1F5FD4] focus:ring-2 focus:ring-[#FFE600]"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {filtros.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => {
+                    setFiltro(f.id);
+                    setCursor(-1);
+                  }}
+                  className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wide transition ${
+                    filtro === f.id
+                      ? "bg-[#1F5FD4] text-white"
+                      : "bg-white text-[#1F5FD4] ring-1 ring-[#1F5FD4]/25 hover:ring-[#1F5FD4]"
+                  }`}
+                >
+                  {f.label} <span className="opacity-70">{f.total}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <ul ref={listaRef} role="listbox" className="max-h-[min(60vh,440px)] overflow-y-auto p-1.5">
+            {!termo && filtro === "todas" && (
+              <li data-linha={-1}>
+                <button
+                  role="option"
+                  aria-selected={!accountId}
+                  onClick={() => escolher(null)}
+                  onMouseEnter={() => setCursor(-1)}
+                  className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition ${
+                    cursor === -1 ? "bg-[#FFFBE0]" : ""
+                  }`}
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1F5FD4] text-[#FFE600]">
+                    <Users className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-black text-[#1F5FD4]">Todas as contas</span>
+                    <span className="block text-[11px] font-semibold text-zinc-500">Visão geral das {accounts.length} contas</span>
+                  </span>
+                  {!accountId && <Check className="h-4 w-4 shrink-0 text-[#1F5FD4]" />}
+                </button>
+              </li>
+            )}
+
+            {visiveis.map((a, i) => {
+              const apelido = String(a.nickname || a.ml_user_id);
+              const atencao = contaPedeAtencao(a);
+              const escolhida = a.id === accountId;
+              const st = accountStatus(a.status);
+              return (
+                <li key={a.id} data-linha={i}>
+                  <button
+                    role="option"
+                    aria-selected={escolhida}
+                    onClick={() => escolher(a.id)}
+                    onMouseEnter={() => setCursor(i)}
+                    className={`flex w-full items-center gap-3 rounded-lg border-l-4 px-2.5 py-2 text-left transition ${
+                      escolhida ? "border-[#1F5FD4]" : "border-transparent"
+                    } ${cursor === i ? "bg-[#FFFBE0]" : ""}`}
+                  >
+                    <AvatarConta nome={apelido} atencao={atencao} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-black text-[#1F5FD4]">{apelido}</span>
+                      <span className="block truncate font-mono text-[11px] text-zinc-500">
+                        {a.ml_user_id} · {a.counts?.orders ?? 0} pedidos
+                      </span>
+                    </span>
+                    <span
+                      className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold sm:inline-flex ${st.className}`}
+                    >
+                      {st.label}
+                    </span>
+                    {escolhida && <Check className="h-4 w-4 shrink-0 text-[#1F5FD4]" />}
+                  </button>
+                </li>
+              );
+            })}
+
+            {visiveis.length === 0 && (
+              <li className="px-3 py-8 text-center text-sm font-semibold text-zinc-500">Nenhuma conta encontrada.</li>
+            )}
+          </ul>
+
+          <div className="hidden items-center justify-between border-t border-zinc-100 px-3 py-2 text-[11px] font-semibold text-zinc-500 md:flex">
+            <span>
+              {visiveis.length} de {accounts.length} contas
+            </span>
+            <span>↑ ↓ navegar · Enter escolher · Esc fechar</span>
+          </div>
+        </div>
       )}
     </div>
   );

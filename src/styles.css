@@ -265,3 +265,51 @@
     font-size: 16px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   CentralML: barras de rolagem e um pouco menor no computador
+
+   A classe "centralml" entra no <html> so enquanto o painel esta aberto
+   (ver CentralML em src/routes/centralml/index.tsx), entao o site publico
+   nao e afetado.
+
+   A barra vertical some (rolar continua igual, com roda ou dedo). A
+   HORIZONTAL fica, fina e nas cores do painel: sem ela nao da para ver as
+   colunas de uma tabela larga.
+
+   O zoom de 85% vale so de 1024px para cima. No celular a tela ja e pequena
+   e reduzir deixaria o texto ilegivel.
+--------------------------------------------------------------------------- */
+html.centralml,
+html.centralml * {
+  scrollbar-width: none;
+}
+html.centralml::-webkit-scrollbar,
+html.centralml *::-webkit-scrollbar {
+  display: none;
+}
+html.centralml .overflow-x-auto,
+html.centralml .overflow-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #1f5fd4 #fffbe0;
+}
+html.centralml .overflow-x-auto::-webkit-scrollbar,
+html.centralml .overflow-auto::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+  height: 8px;
+}
+html.centralml .overflow-x-auto::-webkit-scrollbar-track,
+html.centralml .overflow-auto::-webkit-scrollbar-track {
+  background: #fffbe0;
+}
+html.centralml .overflow-x-auto::-webkit-scrollbar-thumb,
+html.centralml .overflow-auto::-webkit-scrollbar-thumb {
+  background: #1f5fd4;
+  border-radius: 999px;
+}
+@media (min-width: 1024px) {
+  html.centralml {
+    zoom: 0.85;
+  }
+}
