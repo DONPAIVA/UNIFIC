@@ -22,7 +22,10 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeft,
+  Banknote,
+  Barcode,
   CheckCircle2,
+  CreditCard,
   ClipboardList,
   Copy,
   Database,
@@ -1902,6 +1905,118 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* Forma de pagamento                                                         */
+/* -------------------------------------------------------------------------- */
+
+/** Marca do Pix, desenhada aqui (geometria própria), no verde-água oficial. */
+function MarcaPix({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} role="img" aria-label="Pix" fill="currentColor">
+      <path d="M12 2.4c.6 0 1.2.24 1.65.69l3.1 3.1-1.9 1.9a2.1 2.1 0 0 0-1.49.62L12 10.07 10.63 8.7a2.1 2.1 0 0 0-1.49-.62l-1.9-1.9 3.1-3.1c.45-.45 1.05-.69 1.56-.69Zm-6.9 4.8 1.9 1.9c.24.24.38.57.38.91v.98c0 .34.14.67.38.91L9.13 13.3c-.24.24-.38.57-.38.91v.98c0 .34-.14.67-.38.91l-1.9 1.9-3.1-3.1a2.34 2.34 0 0 1 0-3.3L5.1 7.2Zm13.8 0 2.1 2.1a2.34 2.34 0 0 1 0 3.3l-3.1 3.1-1.9-1.9a1.28 1.28 0 0 0-.38-.91v-.98c0-.34-.14-.67-.38-.91l1.27-1.27c.24-.24.38-.57.38-.91v-.98c0-.34.14-.67.38-.91l1.13-1.13Zm-6.9 6.73 1.37 1.37c.4.4.93.62 1.49.62l1.9 1.9-3.1 3.1a2.34 2.34 0 0 1-3.3 0l-3.1-3.1 1.9-1.9c.56 0 1.09-.22 1.49-.62L12 13.93Z" />
+    </svg>
+  );
+}
+
+/**
+ * Nome, ícone e cor de uma forma de pagamento do Mercado Livre, a partir do
+ * payment_type e do payment_method_id que a API devolve. Valores confirmados
+ * em pedidos reais: credit_card/visa, account_money, e os demais pela doc.
+ */
+function descreverPagamento(tipo: string | null, metodo: string | null) {
+  const t = String(tipo ?? "").toLowerCase();
+  const m = String(metodo ?? "").toLowerCase();
+  const bandeiras: Record<string, string> = {
+    visa: "Visa",
+    master: "Mastercard",
+    mastercard: "Mastercard",
+    amex: "Amex",
+    elo: "Elo",
+    hipercard: "Hipercard",
+    debvisa: "Visa Débito",
+    debmaster: "Mastercard Débito",
+    debelo: "Elo Débito",
+  };
+
+  if (t === "bank_transfer" || m === "pix") {
+    return { rotulo: "Pix", bandeira: null as string | null, Icone: MarcaPix, cor: "text-[#32BCAD]", fundo: "bg-[#E6F7F4]" };
+  }
+  if (t === "account_money" || m === "account_money") {
+    return { rotulo: "Saldo em conta", bandeira: null, Icone: Wallet, cor: "text-[#1F5FD4]", fundo: "bg-[#EAF1FC]" };
+  }
+  if (t === "ticket" || m === "bolbradesco" || m.includes("boleto")) {
+    return { rotulo: "Boleto", bandeira: null, Icone: Barcode, cor: "text-zinc-700", fundo: "bg-zinc-100" };
+  }
+  if (t === "consumer_credits" || m === "consumer_credits") {
+    return { rotulo: "Mercado Crédito", bandeira: null, Icone: Banknote, cor: "text-[#1F5FD4]", fundo: "bg-[#EAF1FC]" };
+  }
+  if (t === "debit_card") {
+    return { rotulo: "Cartão de débito", bandeira: bandeiras[m] ?? null, Icone: CreditCard, cor: "text-[#1F5FD4]", fundo: "bg-[#EAF1FC]" };
+  }
+  if (t === "credit_card") {
+    return { rotulo: "Cartão de crédito", bandeira: bandeiras[m] ?? null, Icone: CreditCard, cor: "text-[#1F5FD4]", fundo: "bg-[#EAF1FC]" };
+  }
+  return { rotulo: metodo || tipo || "Forma não informada", bandeira: null, Icone: CreditCard, cor: "text-zinc-600", fundo: "bg-zinc-100" };
+}
+
+const STATUS_PAGAMENTO: Record<string, { label: string; cor: string }> = {
+  approved: { label: "aprovado", cor: "border-emerald-300 bg-emerald-100 text-emerald-800" },
+  pending: { label: "pendente", cor: "border-amber-300 bg-amber-100 text-amber-900" },
+  in_process: { label: "em análise", cor: "border-amber-300 bg-amber-100 text-amber-900" },
+  rejected: { label: "recusado", cor: "border-red-300 bg-red-100 text-red-800" },
+  refunded: { label: "estornado", cor: "border-zinc-300 bg-zinc-100 text-zinc-700" },
+  cancelled: { label: "cancelado", cor: "border-zinc-300 bg-zinc-100 text-zinc-700" },
+  charged_back: { label: "contestado", cor: "border-red-300 bg-red-100 text-red-800" },
+};
+
+/** Como a compra foi paga: cada pagamento com ícone, bandeira, parcelas e status. */
+function PagamentoDoPedido({ pagamentos, pagoTotal, moeda }: { pagamentos: any[]; pagoTotal: number | null; moeda: string | null }) {
+  return (
+    <Panel title="Como foi paga">
+      {pagamentos.length === 0 ? (
+        <Empty>O Mercado Livre não informou a forma de pagamento deste pedido.</Empty>
+      ) : (
+        <div className="space-y-2.5">
+          {pagamentos.map((p: any, i: number) => {
+            const d = descreverPagamento(p.tipo, p.metodo);
+            const st = STATUS_PAGAMENTO[String(p.status ?? "").toLowerCase()] ?? {
+              label: p.status ?? "—",
+              cor: "border-zinc-300 bg-zinc-100 text-zinc-700",
+            };
+            const parcelas = Number(p.parcelas) > 1 ? `${p.parcelas}x` : "à vista";
+            return (
+              <div key={p.id || i} className="flex items-center gap-3 rounded-xl border border-zinc-200 p-3">
+                <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${d.fundo} ${d.cor}`}>
+                  <d.Icone className="h-6 w-6" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-1.5 text-sm font-black text-zinc-900">
+                    {d.rotulo}
+                    {d.bandeira && (
+                      <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] font-bold text-zinc-700">{d.bandeira}</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-zinc-600">
+                    {parcelas}
+                    {p.valor != null && ` · ${fmtMoney(p.valor, moeda)}`}
+                    {p.data && ` · ${fmtDateTime(p.data)}`}
+                  </p>
+                </div>
+                <Badge className={st.cor}>{st.label}</Badge>
+              </div>
+            );
+          })}
+          {pagoTotal != null && (
+            <p className="pt-1 text-right text-sm font-black text-zinc-900">
+              Total pago: <span className="text-[#1F5FD4]">{fmtMoney(pagoTotal, moeda)}</span>
+            </p>
+          )}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 /* ========================================================================== */
 /* Pedidos                                                                    */
 /* ========================================================================== */
@@ -2115,6 +2230,12 @@ function PedidoDetalhe({ id, onBack }: { id: string; onBack: () => void }) {
           )}
         </div>
       </Panel>
+
+      <PagamentoDoPedido
+        pagamentos={data.aoVivo?.pagamentos ?? []}
+        pagoTotal={data.aoVivo?.pagoTotal ?? null}
+        moeda={o.currency_id}
+      />
 
       <Panel title="Envio">
         {!s ? (
