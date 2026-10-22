@@ -298,6 +298,56 @@ export const adminAccounts = createServerFn({ method: "GET" })
     }));
   });
 
+/*
+ * Fotos de perfil das contas do Mercado Livre.
+ *
+ * O ML devolve a foto em /users/{id}.thumbnail.picture_url — mas isso não fica
+ * no nosso banco, e buscar 34 contas a cada abertura do seletor seria lento.
+ * Por isso há um cache em memória do servidor (10 min): a primeira chamada
+ * busca, as seguintes respondem na hora. Sem SQL e sem token no navegador —
+ * só o mapa { accountId: url | null } sai daqui.
+ *
+ * Nem toda conta tem foto; quando não tem, o valor é null e a tela cai na
+ * inicial colorida de sempre.
+ */
+let cacheFotos: { em: number; mapa: Record<string, string | null> } | null = null;
+const CACHE_FOTOS_MS = 10 * 60_000;
+
+export const adminFotosDasContas = createServerFn({ method: "GET" })
+  .middleware([requireAdminUser])
+  .handler(async () => {
+    if (cacheFotos && Date.now() - cacheFotos.em < CACHE_FOTOS_MS) return cacheFotos.mapa;
+
+    const { db } = await import("./server/db.server");
+    const { mlFetch } = await import("./server/ml-api.server");
+
+    const { data } = await db("ml_connections")
+      .select("*")
+      .eq("provider", "mercado_livre")
+      .in("status", ["active", "syncing"]);
+    const contas = (data ?? []) as any[];
+
+    const mapa: Record<string, string | null> = {};
+    // Em lotes de 8: rápido sem estourar o limite de chamadas simultâneas do ML.
+    const LOTE = 8;
+    for (let i = 0; i < contas.length; i += LOTE) {
+      await Promise.all(
+        contas.slice(i, i + LOTE).map(async (conta) => {
+          try {
+            const r = await mlFetch(conta, `/users/${conta.ml_user_id}`, { actor: "centralml:fotos" });
+            const url = (r.data as any)?.thumbnail?.picture_url;
+            mapa[String(conta.id)] = typeof url === "string" && url ? url : null;
+          } catch {
+            mapa[String(conta.id)] = null;
+          }
+        }),
+      );
+    }
+
+    cacheFotos = { em: Date.now(), mapa };
+    return mapa;
+  });
+
 export const adminAccount = createServerFn({ method: "GET" })
   .middleware([requireAdminUser])
   .inputValidator((input: { id: string }) => ({ id: String(input.id) }))

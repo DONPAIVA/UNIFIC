@@ -73,6 +73,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   adminAccount,
   adminAccounts,
+  adminFotosDasContas,
   adminAddAdmin,
   adminApiCatalog,
   adminApiConsole,
@@ -1125,15 +1126,42 @@ function contaPedeAtencao(a: any) {
   return a.status !== "active" || ["expirado", "reautorizacao", "desconectado"].includes(a.tokenStatus?.state ?? "");
 }
 
-/** Inicial da conta num círculo amarelo — âmbar quando a conta pede atenção. */
-function AvatarConta({ nome, atencao = false, grande = false }: { nome: string; atencao?: boolean; grande?: boolean }) {
+/**
+ * Avatar da conta: a foto do Mercado Livre quando existe, senão a inicial num
+ * círculo amarelo. O pontinho âmbar marca a conta que pede atenção.
+ *
+ * `foto === undefined` = ainda carregando (mostra a inicial); `null` = a conta
+ * não tem foto. Se a imagem falhar ao carregar, volta para a inicial.
+ */
+function AvatarConta({
+  nome,
+  foto,
+  atencao = false,
+  grande = false,
+}: {
+  nome: string;
+  foto?: string | null | undefined;
+  atencao?: boolean;
+  grande?: boolean;
+}) {
+  const [erro, setErro] = useState(false);
+  const tamanho = grande ? "h-11 w-11 text-base" : "h-9 w-9 text-sm";
+  const mostrarFoto = foto && !erro;
   return (
-    <span
-      className={`relative flex shrink-0 items-center justify-center rounded-full bg-[#FFE600] font-black uppercase text-[#1F5FD4] ${
-        grande ? "h-11 w-11 text-base" : "h-9 w-9 text-sm"
-      }`}
-    >
-      {nome.slice(0, 1)}
+    <span className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full ${tamanho}`}>
+      {mostrarFoto ? (
+        <img
+          src={foto}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={() => setErro(true)}
+        />
+      ) : (
+        <span className="flex h-full w-full items-center justify-center bg-[#FFE600] font-black uppercase text-[#1F5FD4]">
+          {nome.slice(0, 1)}
+        </span>
+      )}
       {atencao && (
         <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white bg-amber-500" />
       )}
@@ -1155,6 +1183,10 @@ type FiltroConta = "todas" | "ok" | "atencao";
  */
 function AccountSelector({ accountId, onChange }: { accountId: string | null; onChange: (id: string | null) => void }) {
   const { data, loading, error, reload } = useAsync(["contas"], () => adminAccounts());
+  // Fotos vêm à parte: a lista aparece na hora e os avatares preenchem quando
+  // as fotos chegam. Nunca travam o seletor.
+  const { data: fotos } = useAsync(["fotos-contas"], () => adminFotosDasContas());
+  const fotoDe = (id: string): string | null | undefined => (fotos ? (fotos[id] ?? null) : undefined);
   const accounts = (data ?? []) as any[];
   const current = accounts.find((a) => a.id === accountId) ?? null;
   const nome = current ? String(current.nickname || current.ml_user_id) : null;
@@ -1242,7 +1274,7 @@ function AccountSelector({ accountId, onChange }: { accountId: string | null; on
             className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left"
           >
             {nome ? (
-              <AvatarConta nome={nome} atencao={contaPedeAtencao(current)} grande />
+              <AvatarConta nome={nome} foto={fotoDe(current.id)} atencao={contaPedeAtencao(current)} grande />
             ) : (
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FFE600] text-[#1F5FD4]">
                 <Users className="h-5 w-5" />
@@ -1370,7 +1402,7 @@ function AccountSelector({ accountId, onChange }: { accountId: string | null; on
                       escolhida ? "border-[#1F5FD4]" : "border-transparent"
                     } ${cursor === i ? "bg-[#FFFBE0]" : ""}`}
                   >
-                    <AvatarConta nome={apelido} atencao={atencao} />
+                    <AvatarConta nome={apelido} foto={fotoDe(a.id)} atencao={atencao} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-black text-[#1F5FD4]">{apelido}</span>
                       <span className="block truncate font-mono text-[11px] text-zinc-500">
