@@ -33,6 +33,8 @@ import {
   Menu,
   MessageCircle,
   Package,
+  PanelLeftClose,
+  PanelLeftOpen,
   Play,
   RefreshCw,
   Search,
@@ -772,8 +774,27 @@ function CentralML() {
     return () => document.documentElement.classList.remove("centralml");
   }, []);
 
-  /** Gaveta de navegação do celular. No computador o menu fica sempre à vista. */
+  /** Gaveta de navegação do celular. */
   const [menuAberto, setMenuAberto] = useState(false);
+
+  /** Menu lateral do computador recolhido só nos ícones. Lembrado entre visitas. */
+  const [menuRecolhido, setMenuRecolhido] = useState(false);
+  useEffect(() => {
+    try {
+      setMenuRecolhido(localStorage.getItem("centralml:menu-recolhido") === "1");
+    } catch {
+      /* sem armazenamento local: começa expandido */
+    }
+  }, []);
+  const alternarRecolhido = () =>
+    setMenuRecolhido((atual) => {
+      try {
+        localStorage.setItem("centralml:menu-recolhido", atual ? "0" : "1");
+      } catch {
+        /* sem armazenamento local: vale só nesta visita */
+      }
+      return !atual;
+    });
 
   /** Troca de aba, fecha a gaveta do celular e volta ao topo da página. */
   const irParaAba = (id: TabId) => {
@@ -915,10 +936,15 @@ function CentralML() {
           sempre do painel. */}
       <header className="sticky top-0 z-40 border-b-4 border-[#1F5FD4] bg-[#FFE600] shadow-[0_6px_24px_rgba(0,0,0,0.45)]">
         <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-3 px-3 sm:px-5">
+          {/* Um toque: no celular abre a gaveta; no computador recolhe ou
+              expande o menu lateral. */}
           <button
-            onClick={() => setMenuAberto(true)}
-            className="-ml-1 flex h-10 w-10 items-center justify-center rounded-xl text-[#1F5FD4] hover:bg-black/10 lg:hidden"
+            onClick={() =>
+              window.matchMedia("(min-width: 1024px)").matches ? alternarRecolhido() : setMenuAberto(true)
+            }
+            className="-ml-1 flex h-10 w-10 items-center justify-center rounded-xl text-[#1F5FD4] hover:bg-black/10"
             aria-label="Abrir menu"
+            title={menuRecolhido ? "Expandir menu" : "Recolher menu"}
           >
             <Menu className="h-6 w-6" />
           </button>
@@ -962,16 +988,33 @@ function CentralML() {
       )}
 
       <div className="mx-auto flex max-w-[1440px] gap-6 px-3 py-4 sm:px-5 sm:py-6">
-        <aside className="hidden w-60 shrink-0 lg:block">
-          {/* Branco como os cartões: sobre o Matrix, fundo sólido é o que
-              deixa o menu legível. */}
-          {/* Sem altura máxima: o menu inteiro cabe na tela e não precisa de
-              rolagem própria. */}
-          <div className="sticky top-24 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
-            <div className="h-1 w-full bg-[#FFE600]" />
-            <div className="p-3">
-              <Navegacao tab={tab} onPick={irParaAba} />
+        <aside
+          className={`hidden shrink-0 transition-[width] duration-200 lg:block ${menuRecolhido ? "w-[68px]" : "w-60"}`}
+        >
+          {/* Branco como os cartões e da altura da tela: fica preso ao rolar
+              e não deixa buraco embaixo. A altura divide 100vh pelo zoom do
+              painel (--cml-zoom, em styles.css) — com zoom, 100vh encolhe
+              junto e o menu não chegaria ao fim da tela. */}
+          <div className="sticky top-[92px] flex h-[calc(100vh/var(--cml-zoom,1)_-_116px)] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
+            <div className="h-1 w-full shrink-0 bg-[#FFE600]" />
+            <div className={`flex-1 overflow-y-auto ${menuRecolhido ? "px-2 py-3" : "p-3"}`}>
+              <Navegacao tab={tab} onPick={irParaAba} compacto={menuRecolhido} />
             </div>
+            <button
+              onClick={alternarRecolhido}
+              className={`flex shrink-0 items-center gap-2 border-t border-zinc-100 py-3 text-xs font-black uppercase tracking-wide text-[#1F5FD4] transition-colors hover:bg-[#FFFBE0] ${
+                menuRecolhido ? "justify-center" : "px-4"
+              }`}
+              title={menuRecolhido ? "Expandir menu" : "Recolher menu"}
+            >
+              {menuRecolhido ? (
+                <PanelLeftOpen className="h-5 w-5" />
+              ) : (
+                <>
+                  <PanelLeftClose className="h-4 w-4" /> Recolher menu
+                </>
+              )}
+            </button>
           </div>
         </aside>
 
@@ -1019,16 +1062,23 @@ function CentralML() {
  * Menu do painel, usado na lateral do computador e na gaveta do celular.
  * Os quatro grupos ficam sempre abertos: são 17 itens, cabem numa coluna e
  * você enxerga tudo sem precisar expandir nada.
+ *
+ * `compacto`: menu recolhido — só os ícones, com o nome no title (aparece ao
+ * passar o mouse) e um traço amarelo no lugar do nome de cada grupo.
  */
-function Navegacao({ tab, onPick }: { tab: TabId; onPick: (id: TabId) => void }) {
+function Navegacao({ tab, onPick, compacto = false }: { tab: TabId; onPick: (id: TabId) => void; compacto?: boolean }) {
   return (
-    <nav className="space-y-4">
+    <nav className={compacto ? "space-y-3" : "space-y-4"}>
       {GRUPOS.map((grupo) => (
         <div key={grupo}>
-          <p className="flex items-center gap-2 px-2.5 pb-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-[#1F5FD4]">
-            <span className="h-3.5 w-1 rounded-full bg-[#FFE600]" />
-            {grupo}
-          </p>
+          {compacto ? (
+            <span className="mx-auto mb-1.5 block h-1 w-6 rounded-full bg-[#FFE600]" title={grupo} />
+          ) : (
+            <p className="flex items-center gap-2 px-2.5 pb-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-[#1F5FD4]">
+              <span className="h-3.5 w-1 rounded-full bg-[#FFE600]" />
+              {grupo}
+            </p>
+          )}
           <ul className="space-y-0.5">
             {TABS.filter((t) => t.grupo === grupo).map(({ id, label, icon: Icon }) => {
               const ativa = tab === id;
@@ -1037,7 +1087,11 @@ function Navegacao({ tab, onPick }: { tab: TabId; onPick: (id: TabId) => void })
                   <button
                     onClick={() => onPick(id)}
                     aria-current={ativa ? "page" : undefined}
-                    className={`group flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${
+                    aria-label={compacto ? label : undefined}
+                    title={compacto ? label : undefined}
+                    className={`group flex w-full items-center rounded-lg py-2 text-left text-sm transition-colors ${
+                      compacto ? "justify-center px-0" : "gap-3 px-2.5"
+                    } ${
                       ativa
                         ? // Amarelo com texto azul: o par de cores do Mercado Livre.
                           "bg-[#FFE600] font-black text-[#1F5FD4] shadow-[0_0_16px_rgba(255,230,0,0.25)]"
@@ -1045,9 +1099,11 @@ function Navegacao({ tab, onPick }: { tab: TabId; onPick: (id: TabId) => void })
                     }`}
                   >
                     <Icon
-                      className={`h-4 w-4 shrink-0 ${ativa ? "text-[#1F5FD4]" : "text-zinc-400 group-hover:text-[#1F5FD4]"}`}
+                      className={`shrink-0 ${compacto ? "h-5 w-5" : "h-4 w-4"} ${
+                        ativa ? "text-[#1F5FD4]" : "text-zinc-400 group-hover:text-[#1F5FD4]"
+                      }`}
                     />
-                    <span className="truncate">{label}</span>
+                    {!compacto && <span className="truncate">{label}</span>}
                   </button>
                 </li>
               );

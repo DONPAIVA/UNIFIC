@@ -280,6 +280,10 @@
    O zoom de 85% vale so de 1024px para cima. No celular a tela ja e pequena
    e reduzir deixaria o texto ilegivel.
 --------------------------------------------------------------------------- */
+html.centralml {
+  /* Lido pelo menu lateral para ocupar a altura da tela mesmo com zoom. */
+  --cml-zoom: 1;
+}
 html.centralml,
 html.centralml * {
   scrollbar-width: none;
@@ -311,5 +315,6 @@ html.centralml .overflow-auto::-webkit-scrollbar-thumb {
 @media (min-width: 1024px) {
   html.centralml {
     zoom: 0.85;
+    --cml-zoom: 0.85;
   }
 }
