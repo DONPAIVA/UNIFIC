@@ -2,8 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
 import { Layout } from "@/components/site/Layout";
-import { listPedidos } from "@/lib/api";
-import { buildMovimentos, fmtDateTime, statusFor } from "@/lib/tracking";
+import { notificacoesPublicas } from "@/lib/rastreio.functions";
+import { fmtDateTime } from "@/lib/tracking";
 
 export const Route = createFileRoute("/notificacoes")({
   head: () => ({
@@ -18,11 +18,11 @@ export const Route = createFileRoute("/notificacoes")({
 });
 
 function Notificacoes() {
-  const { data } = useQuery({ queryKey: ["pedidos"], queryFn: listPedidos });
-  const avisos = (data ?? []).flatMap((p) => {
-    const m = buildMovimentos(p)[0];
-    return m ? [{ code: p.tracking_code, status: statusFor(p), title: m.title, place: m.place, at: m.at }] : [];
+  const { data } = useQuery({
+    queryKey: ["notificacoes-publicas"],
+    queryFn: () => notificacoesPublicas(),
   });
+  const avisos = data?.avisos ?? [];
 
   return (
     <Layout>
@@ -36,7 +36,7 @@ function Notificacoes() {
           {avisos.map((a) => (
             <div key={a.code} className="rounded-lg border border-border p-3 text-sm">
               <p className="font-semibold">{a.code} — {a.title}</p>
-              <p className="text-xs text-muted-foreground">{a.place} · {fmtDateTime(a.at)} · {a.status}</p>
+              <p className="text-xs text-muted-foreground">{a.place} · {fmtDateTime(new Date(a.at))} · {a.status}</p>
             </div>
           ))}
         </div>

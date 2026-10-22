@@ -4,7 +4,8 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FileText, Info, ShieldCheck } from "lucide-react";
 import { Layout } from "@/components/site/Layout";
-import { findPedido, insertTable } from "@/lib/api";
+import { insertTable } from "@/lib/api";
+import { rastrearPorCodigo } from "@/lib/rastreio.functions";
 import { NotaFiscal } from "@/components/site/NotaFiscal";
 import type { Pedido } from "@/lib/tracking";
 
@@ -32,7 +33,7 @@ function NfPage() {
         throw new Error("Preencha código, tipo de documento, nome completo e um CPF válido.");
       }
       await insertTable("solicitacoes_nf", f);
-      return findPedido(f.order_code);
+      return (await rastrearPorCodigo({ data: { code: f.order_code } })).pedido as Pedido | null;
     },
     onSuccess: (p) => {
       setPedido(p);

@@ -4,7 +4,8 @@ import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, FileText, LogIn, MessageSquareWarning, PackageSearch, Truck } from "lucide-react";
 import { MARKETPLACES, getMarketplace } from "@/lib/marketplaces";
-import { findPedido, findPedidosByCpf, insertTable } from "@/lib/api";
+import { insertTable } from "@/lib/api";
+import { rastrearPorCodigo, rastrearPorCpf } from "@/lib/rastreio.functions";
 import { digitos, formatarCpf } from "@/lib/cpf";
 import { minhaConexao, rastrearMinhaCompraCompleta } from "@/lib/minha-conta.functions";
 import { registrarConsultaRastreio } from "@/lib/rastreio.functions";
@@ -207,7 +208,7 @@ export function TrackingPanel() {
        * Como consequência, a sincronização do Mercado Livre deixou de
        * interferir aqui: se ela estiver incompleta, o rastreio segue igual.
        */
-      const local = await findPedido(code, undefined);
+      const local = (await rastrearPorCodigo({ data: { code } })).pedido as Pedido | null;
       if (local) {
         void registrar({
           code: code.trim(),
@@ -241,7 +242,7 @@ export function TrackingPanel() {
    */
   const buscaPorCpf = useMutation({
     mutationFn: async (cpf: string) => {
-      const encontrados = await findPedidosByCpf(cpf);
+      const encontrados = (await rastrearPorCpf({ data: { cpf } })).pedidos as Pedido[];
       if (!encontrados.length) {
         throw new Error("Nenhum rastreio cadastrado para este CPF.");
       }

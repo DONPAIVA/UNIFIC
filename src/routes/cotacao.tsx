@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Package, Search } from "lucide-react";
 import { Layout } from "@/components/site/Layout";
-import { insertTable, listTable } from "@/lib/api";
+import { insertTable } from "@/lib/api";
 import { money } from "@/lib/tracking";
 
 export const Route = createFileRoute("/cotacao")({
