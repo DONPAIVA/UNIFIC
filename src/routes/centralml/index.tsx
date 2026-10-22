@@ -1484,19 +1484,21 @@ function DashboardTab({ onOpenAccount }: { onOpenAccount: (id: string) => void }
           {data.accounts.length === 0 ? (
             <Empty />
           ) : (
-            <Table head={["Conta", "ML user", "Status", "Token", "Última sync"]}>
-              {data.accounts.map((a: any) => (
-                <tr key={a.id} className="cursor-pointer hover:bg-zinc-50" onClick={() => onOpenAccount(a.id)}>
-                  <td className="px-2 py-2 font-semibold text-[#1F5FD4]">{a.nickname || "—"}</td>
-                  <td className="px-2 py-2 font-mono text-xs">{a.ml_user_id}</td>
-                  <td className="px-2 py-2">
-                    <Badge className={accountStatus(a.status).className}>{accountStatus(a.status).label}</Badge>
-                  </td>
-                  <td className="px-2 py-2 text-xs">{TOKEN_STATE[a.tokenStatus?.state ?? ""]?.label ?? "—"}</td>
-                  <td className="px-2 py-2 text-xs">{fmtDateTime(a.last_sync_at)}</td>
-                </tr>
-              ))}
-            </Table>
+            <div className="max-h-80 overflow-y-auto">
+              <Table head={["Conta", "ML user", "Status", "Token", "Última sync"]}>
+                {data.accounts.map((a: any) => (
+                  <tr key={a.id} className="cursor-pointer hover:bg-zinc-50" onClick={() => onOpenAccount(a.id)}>
+                    <td className="px-2 py-2 font-semibold text-[#1F5FD4]">{a.nickname || "—"}</td>
+                    <td className="px-2 py-2 font-mono text-xs">{a.ml_user_id}</td>
+                    <td className="px-2 py-2">
+                      <Badge className={`whitespace-nowrap ${accountStatus(a.status).className}`}>{accountStatus(a.status).label}</Badge>
+                    </td>
+                    <td className="px-2 py-2 text-xs">{TOKEN_STATE[a.tokenStatus?.state ?? ""]?.label ?? "—"}</td>
+                    <td className="px-2 py-2 text-xs">{fmtDateTime(a.last_sync_at)}</td>
+                  </tr>
+                ))}
+              </Table>
+            </div>
           )}
         </Panel>
 
@@ -1504,6 +1506,7 @@ function DashboardTab({ onOpenAccount }: { onOpenAccount: (id: string) => void }
           {data.lastRuns.length === 0 ? (
             <Empty />
           ) : (
+            <div className="max-h-80 overflow-y-auto">
             <Table head={["Início", "Tipo", "Status", "Pedidos", "Envios", "Eventos", "Duração"]}>
               {data.lastRuns.map((r: any) => (
                 <tr key={r.id}>
@@ -1521,6 +1524,7 @@ function DashboardTab({ onOpenAccount }: { onOpenAccount: (id: string) => void }
                 </tr>
               ))}
             </Table>
+            </div>
           )}
         </Panel>
 
@@ -1528,6 +1532,7 @@ function DashboardTab({ onOpenAccount }: { onOpenAccount: (id: string) => void }
           {data.lastTracking.length === 0 ? (
             <Empty>Nenhuma consulta registrada até agora.</Empty>
           ) : (
+            <div className="max-h-80 overflow-y-auto">
             <Table head={["Quando", "Código", "Origem", "Resultado", "IP"]}>
               {data.lastTracking.map((r: any) => (
                 <tr key={r.id}>
@@ -1545,6 +1550,7 @@ function DashboardTab({ onOpenAccount }: { onOpenAccount: (id: string) => void }
                 </tr>
               ))}
             </Table>
+            </div>
           )}
         </Panel>
 
@@ -1552,7 +1558,7 @@ function DashboardTab({ onOpenAccount }: { onOpenAccount: (id: string) => void }
           {data.lastLogs.length === 0 ? (
             <Empty />
           ) : (
-            <ul className="space-y-2">
+            <ul className="max-h-80 space-y-2 overflow-y-auto">
               {data.lastLogs.map((l: any) => (
                 <li key={l.id} className="flex items-start gap-2 text-xs">
                   <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${l.level === "error" ? "bg-red-500" : l.level === "warn" ? "bg-amber-500" : "bg-emerald-500"}`} />
