@@ -945,15 +945,12 @@ function CentralML() {
           sempre do painel. */}
       <header className="sticky top-0 z-40 border-b-4 border-[#1F5FD4] bg-[#FFE600] shadow-[0_6px_24px_rgba(0,0,0,0.45)]">
         <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-3 px-3 sm:px-5">
-          {/* Um toque: no celular abre a gaveta; no computador recolhe ou
-              expande o menu lateral. */}
+          {/* Só no celular: abre a gaveta do menu. No computador o menu já fica
+              à vista e recolhe pelo botão "Recolher menu" do rodapé. */}
           <button
-            onClick={() =>
-              window.matchMedia("(min-width: 1024px)").matches ? alternarRecolhido() : setMenuAberto(true)
-            }
-            className="-ml-1 flex h-10 w-10 items-center justify-center rounded-xl text-[#1F5FD4] hover:bg-black/10"
+            onClick={() => setMenuAberto(true)}
+            className="-ml-1 flex h-10 w-10 items-center justify-center rounded-xl text-[#1F5FD4] hover:bg-black/10 lg:hidden"
             aria-label="Abrir menu"
-            title={menuRecolhido ? "Expandir menu" : "Recolher menu"}
           >
             <Menu className="h-6 w-6" />
           </button>
