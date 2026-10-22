@@ -30,7 +30,6 @@ import {
   Globe,
   Key,
   LoaderCircle,
-  LogOut,
   Menu,
   MessageCircle,
   Package,
@@ -302,6 +301,13 @@ function Table({ head, children }: { head: string[]; children: React.ReactNode }
 type Async<T> = { data: T | null; loading: boolean; error: string | null; reload: () => void };
 
 /**
+ * Avisa o painel que a liberação do código de 6 dígitos venceu (12 h).
+ * Qualquer consulta que receba ERRO_2FA dispara; o CentralML escuta e volta
+ * para a tela do código, em vez de cada aba mostrar o erro cru.
+ */
+const EVENTO_2FA_VENCEU = "centralml:2fa-venceu";
+
+/**
  * Carregamento com CACHE entre trocas de aba.
  *
  * Antes cada aba refazia todas as consultas ao voltar. Como cada ida ao
@@ -324,6 +330,12 @@ function useAsync<T>(chave: unknown[], fn: () => Promise<T>, enabled = true): As
     // Mantém os dados anteriores enquanto muda o filtro: sem piscar a tela.
     placeholderData: (anterior) => anterior,
   });
+
+  useEffect(() => {
+    if (q.error && errorMessage(q.error).includes(ERRO_2FA)) {
+      window.dispatchEvent(new Event(EVENTO_2FA_VENCEU));
+    }
+  }, [q.error]);
 
   return {
     data: (q.data as T | undefined) ?? null,
@@ -829,6 +841,33 @@ function CentralML() {
     aberturaDoPainel();
   }, [session]);
 
+  /*
+   * Sem botão de sair: a sessão do painel dura enquanto o código de 6 dígitos
+   * vale. Quando vence, volta sozinho para a tela do código — seja porque uma
+   * aba recebeu ERRO_2FA, seja pela conferência a cada minuto (que também
+   * pega o caso de a tela ficar parada, sem nenhuma consulta rodando).
+   */
+  useEffect(() => {
+    if (!session) return;
+    const venceu = () => {
+      setSession(null);
+      setPedindoCodigo(true);
+    };
+    const conferir = async () => {
+      try {
+        await adminSession();
+      } catch (e) {
+        if (String(errorMessage(e)).includes(ERRO_2FA)) venceu();
+      }
+    };
+    window.addEventListener(EVENTO_2FA_VENCEU, venceu);
+    const timer = window.setInterval(() => void conferir(), 60_000);
+    return () => {
+      window.removeEventListener(EVENTO_2FA_VENCEU, venceu);
+      window.clearInterval(timer);
+    };
+  }, [session]);
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setSession(null);
@@ -885,23 +924,6 @@ function CentralML() {
             </span>
           </div>
 
-          <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
-            <a
-              href="/"
-              className="hidden items-center gap-1 text-xs font-bold text-black/70 hover:text-black sm:flex"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao Unific+
-            </a>
-            <span className="hidden max-w-[220px] truncate text-xs font-semibold text-black/70 md:block">{session.email}</span>
-            <button
-              onClick={signOut}
-              className="flex h-9 items-center gap-1 rounded-lg bg-black/10 px-3 text-xs font-bold text-black hover:bg-black/20"
-              title="Sair"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Sair</span>
-            </button>
-          </div>
         </div>
       </header>
 
@@ -928,15 +950,6 @@ function CentralML() {
             <div className="flex-1 overflow-y-auto p-3">
               <Navegacao tab={tab} onPick={irParaAba} />
             </div>
-            <div className="shrink-0 border-t border-zinc-200 p-3">
-              <p className="truncate px-2 text-xs font-semibold text-zinc-600">{session.email}</p>
-              <a
-                href="/"
-                className="mt-2 flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-bold text-[#1F5FD4] hover:bg-[#FFFBE0]"
-              >
-                <ArrowLeft className="h-4 w-4" /> Voltar ao Unific+
-              </a>
-            </div>
           </div>
         </div>
       )}
@@ -954,15 +967,19 @@ function CentralML() {
         </aside>
 
         <main className="min-w-0 flex-1">
-          {/* Título da seção numa faixa escura sólida, para ler bem por cima
-              da chuva de caracteres. */}
-          <div className="mb-4 flex items-center gap-3 rounded-xl border border-white/10 bg-black/75 px-3 py-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.45)] backdrop-blur-sm">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#FFE600] text-[#1F5FD4]">
-              <IconeAtual className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#FFE600]">{abaAtual.grupo}</p>
-              <h1 className="truncate text-xl font-black uppercase tracking-wide text-white sm:text-2xl">{abaAtual.label}</h1>
+          {/* Título da seção no mesmo cartão dos números: borda amarela
+              inteira e a barra azul do Mercado Livre à esquerda. */}
+          <div className="mb-4 overflow-hidden rounded-xl border-2 border-[#FFE600] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center gap-3 border-l-[6px] border-[#1F5FD4] px-4 py-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#1F5FD4] text-[#FFE600] shadow-sm">
+                <IconeAtual className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-zinc-500">{abaAtual.grupo}</p>
+                <h1 className="truncate text-xl font-black uppercase tracking-wide text-[#1F5FD4] sm:text-2xl">
+                  {abaAtual.label}
+                </h1>
+              </div>
             </div>
           </div>
 
