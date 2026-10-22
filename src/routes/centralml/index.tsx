@@ -51,6 +51,7 @@ import {
   Truck,
   UserCheck,
   Users,
+  Wallet,
   X,
   XCircle,
 } from "lucide-react";
@@ -74,6 +75,7 @@ import {
   adminAccount,
   adminAccounts,
   adminFotosDasContas,
+  adminResumoComprador,
   adminAddAdmin,
   adminApiCatalog,
   adminApiConsole,
@@ -715,6 +717,7 @@ type TabId =
   | "logs"
   | "erros"
   | "contaml"
+  | "comprador"
   | "mensagens"
   | "perguntas"
   | "reclamacoes"
@@ -738,6 +741,7 @@ const TABS: Array<{
   { id: "clientes", label: "Clientes", icon: UserCheck, grupo: "Visão geral" },
 
   { id: "contaml", label: "Conta ML", icon: Globe, grupo: "Mercado Livre" },
+  { id: "comprador", label: "Comprador", icon: Wallet, grupo: "Mercado Livre" },
   { id: "pedidos", label: "Pedidos", icon: Package, grupo: "Mercado Livre" },
   { id: "mensagens", label: "Mensagens", icon: Send, grupo: "Mercado Livre" },
   { id: "perguntas", label: "Perguntas", icon: MessageCircle, grupo: "Mercado Livre" },
@@ -1046,6 +1050,7 @@ function CentralML() {
             {tab === "logs" && <LogsTab accountId={accountId} />}
             {tab === "erros" && <ErrosTab />}
             {tab === "contaml" && <ContaMlTab accountId={accountId} />}
+            {tab === "comprador" && <CompradorTab accountId={accountId} />}
             {tab === "mensagens" && <MensagensTab accountId={accountId} />}
             {tab === "perguntas" && <PerguntasTab accountId={accountId} />}
             {tab === "reclamacoes" && <ReclamacoesPainel accountId={accountId} />}
@@ -3570,6 +3575,116 @@ function ExigeConta({ titulo }: { titulo: string }) {
         Selecione uma conta em “Conta em foco”, no topo da página.
       </p>
     </Panel>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Comprador — resumo de gastos                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Financeiro do comprador.
+ *
+ * Saldo em dinheiro a API do ML não entrega (403); o que mostramos é quanto a
+ * conta já gastou, a partir dos pedidos sincronizados. Um aviso no topo deixa
+ * claro por que não há saldo de carteira.
+ */
+function CompradorTab({ accountId }: { accountId: string | null }) {
+  const { data, loading, error, reload } = useAsync(
+    ["resumo-comprador", accountId],
+    () => adminResumoComprador({ data: { accountId: accountId! } }),
+    Boolean(accountId),
+  );
+
+  if (!accountId) return <ExigeConta titulo="Comprador" />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  if (loading || !data) return <Loading />;
+
+  const m = (v: number) => fmtMoney(v, data.moeda);
+  const maxMes = Math.max(1, ...data.porMes.map((p) => p.total));
+  const nomeMes = (aaaaMM: string) => {
+    const [a, mes] = aaaaMM.split("-");
+    const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+    return `${nomes[Number(mes) - 1] ?? mes}/${String(a).slice(2)}`;
+  };
+
+  return (
+    <>
+      <Panel title={`Comprador — ${data.conta.nickname ?? data.conta.mlUserId ?? ""}`}>
+        <p className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{data.semSaldo}</span>
+        </p>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Stat label="Total gasto" value={m(data.totalGasto)} tone="ok" />
+          <Stat label="Compras" value={data.totalCompras} />
+          <Stat label="Ticket médio" value={m(data.ticketMedio)} />
+          <Stat label="Maior compra" value={m(data.maiorCompra)} />
+        </div>
+        {data.canceladas > 0 && (
+          <p className="mt-2 text-xs text-zinc-600">
+            {data.canceladas} compra(s) cancelada(s) não entram no total.
+          </p>
+        )}
+      </Panel>
+
+      <Panel title="Gasto por mês">
+        {data.porMes.length === 0 ? (
+          <Empty>Sem compras registradas para esta conta.</Empty>
+        ) : (
+          <div className="space-y-3">
+            {data.porMes.map((p) => (
+              <div key={p.mes} className="flex items-center gap-2 sm:gap-3">
+                <span className="w-12 shrink-0 text-xs font-bold uppercase text-zinc-600">{nomeMes(p.mes)}</span>
+                <div className="h-5 flex-1 overflow-hidden rounded-md bg-zinc-100">
+                  {/* Barra só preenche; o valor fica fora, sempre legível. */}
+                  <div
+                    className="h-full rounded-md bg-[#1F5FD4]"
+                    style={{ width: `${Math.max(4, (p.total / maxMes) * 100)}%` }}
+                  />
+                </div>
+                <span className="w-24 shrink-0 text-right text-xs font-bold tabular-nums text-[#1F5FD4] sm:w-28">
+                  {m(p.total)}
+                </span>
+                <span className="hidden w-16 shrink-0 text-right text-[11px] text-zinc-500 sm:block">
+                  {p.qtd} compra(s)
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="Últimas compras">
+        {data.ultimas.length === 0 ? (
+          <Empty>Sem compras registradas.</Empty>
+        ) : (
+          <Table head={["Pedido", "Item", "Qtd", "Valor", "Status", "Data"]}>
+            {data.ultimas.map((c) => (
+              <tr key={c.id}>
+                <td className="px-2 py-2 font-mono text-[11px] text-[#1F5FD4]">{c.id}</td>
+                <td className="px-2 py-2 text-xs">{c.titulo ?? "—"}</td>
+                <td className="px-2 py-2 text-xs tabular-nums">{c.quantidade ?? "—"}</td>
+                <td className="px-2 py-2 text-xs font-bold tabular-nums">{m(c.valor)}</td>
+                <td className="px-2 py-2">
+                  <Badge
+                    className={
+                      c.status === "cancelled"
+                        ? "border-red-300 bg-red-100 text-red-800"
+                        : "border-emerald-300 bg-emerald-100 text-emerald-800"
+                    }
+                  >
+                    {c.status ?? "—"}
+                  </Badge>
+                </td>
+                <td className="px-2 py-2 text-xs">{fmtDateTime(c.data)}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </Panel>
+    </>
   );
 }
 

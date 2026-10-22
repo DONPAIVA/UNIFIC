@@ -348,6 +348,86 @@ export const adminFotosDasContas = createServerFn({ method: "GET" })
     return mapa;
   });
 
+/**
+ * Resumo financeiro do COMPRADOR de uma conta.
+ *
+ * Saldo em dinheiro (carteira/Mercado Pago) a API do ML não libera para estas
+ * contas (403 forbidden — elas autorizaram rastreio, não pagamentos). O que dá
+ * para mostrar com honestidade é quanto a pessoa JÁ GASTOU, somando as compras
+ * que o Únific+ sincronizou. Tudo vem do nosso banco (ml_orders); nada de novo
+ * é pedido ao Mercado Livre aqui.
+ */
+export const adminResumoComprador = createServerFn({ method: "GET" })
+  .middleware([requireAdminUser])
+  .inputValidator((input: { accountId: string }) => ({ accountId: String(input.accountId) }))
+  .handler(async ({ data, context }) => {
+    await requireOwnedAccount(context.user, data.accountId);
+    const { db, admin } = await import("./server/db.server");
+
+    const { data: conta } = await db("ml_connections")
+      .select("nickname, ml_user_id, first_name, email, site_id")
+      .eq("id", data.accountId)
+      .maybeSingle();
+
+    const { data: linhas } = await admin
+      .from("ml_orders")
+      .select("ml_order_id, status, date_created, total_amount, currency_id, title, quantity")
+      .eq("account_id", data.accountId)
+      .order("date_created", { ascending: false })
+      .limit(5000);
+
+    const pedidos = (linhas ?? []) as any[];
+    const valor = (p: any) => (typeof p.total_amount === "number" ? p.total_amount : Number(p.total_amount) || 0);
+    const pagos = pedidos.filter((p) => p.status !== "cancelled");
+    const cancelados = pedidos.filter((p) => p.status === "cancelled");
+
+    const totalGasto = pagos.reduce((s, p) => s + valor(p), 0);
+    const moeda = pedidos.find((p) => p.currency_id)?.currency_id ?? "BRL";
+
+    // Gasto por mês, dos últimos 6 meses (só os pedidos não cancelados).
+    const meses: Record<string, { total: number; qtd: number }> = {};
+    for (const p of pagos) {
+      if (!p.date_created) continue;
+      const chave = String(p.date_created).slice(0, 7); // AAAA-MM
+      (meses[chave] ??= { total: 0, qtd: 0 }).total += valor(p);
+      meses[chave].qtd += 1;
+    }
+    const porMes = Object.entries(meses)
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+      .slice(0, 6)
+      .map(([mes, v]) => ({ mes, total: v.total, qtd: v.qtd }))
+      .reverse();
+
+    const maior = pagos.reduce((m, p) => Math.max(m, valor(p)), 0);
+
+    return {
+      conta: {
+        nickname: conta?.nickname ?? null,
+        mlUserId: conta?.ml_user_id ?? null,
+        nome: conta?.first_name ?? null,
+        email: conta?.email ?? null,
+      },
+      moeda,
+      totalGasto,
+      totalCompras: pagos.length,
+      ticketMedio: pagos.length ? totalGasto / pagos.length : 0,
+      maiorCompra: maior,
+      canceladas: cancelados.length,
+      porMes,
+      ultimas: pedidos.slice(0, 12).map((p) => ({
+        id: String(p.ml_order_id),
+        titulo: p.title ?? null,
+        quantidade: p.quantity ?? null,
+        valor: valor(p),
+        status: p.status ?? null,
+        data: p.date_created ?? null,
+      })),
+      // Deixa claro na tela por que não há saldo em dinheiro.
+      semSaldo:
+        "O saldo em dinheiro da carteira (Mercado Pago) não é liberado pela API do Mercado Livre para estas contas — elas autorizaram o rastreio de compras, não os pagamentos. Abaixo está o quanto a conta já gastou.",
+    };
+  });
+
 export const adminAccount = createServerFn({ method: "GET" })
   .middleware([requireAdminUser])
   .inputValidator((input: { id: string }) => ({ id: String(input.id) }))
