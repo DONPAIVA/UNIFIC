@@ -261,40 +261,44 @@ export const adminAccounts = createServerFn({ method: "GET" })
     const ids = accounts.map((a: any) => String(a.id));
 
     /*
-     * Contagem por conta em 5 consultas no total, não 5 POR conta.
-     * Antes eram 5×N idas ao Supabase (~1,5 s cada); com 10 contas isso
-     * significava 50 requisições só para preencher a tabela.
-     * Aqui buscamos apenas a coluna account_id e contamos em memória.
+     * Contagem por conta usando count EXATO (head:true): o banco devolve só o
+     * número, sem trazer linha nenhuma — então não sofre com teto de linhas do
+     * Supabase. (O jeito antigo trazia as linhas e contava na memória com um
+     * limite; quando a conta tinha muitos pedidos, estourava o teto e ela
+     * aparecia como "0 pedidos" mesmo cheia.)
+     *
+     * Para não abrir conexões demais de uma vez com muitas contas, as contagens
+     * vão em lotes.
      */
-    const tally = async (tabela: string, apply?: (q: any) => any) => {
-      let q = admin.from(tabela).select("account_id").in("account_id", ids).limit(50000);
+    const contar = async (tabela: string, accountId: string, apply?: (q: any) => any) => {
+      let q = admin.from(tabela).select("account_id", { count: "exact", head: true }).eq("account_id", accountId);
       if (apply) q = apply(q);
-      const { data } = await q;
-      const mapa = new Map<string, number>();
-      for (const linha of data ?? []) {
-        const k = String(linha.account_id);
-        mapa.set(k, (mapa.get(k) ?? 0) + 1);
-      }
-      return mapa;
+      const { count } = await q;
+      return count ?? 0;
     };
 
-    const [orders, shipments, events, errors, tracking] = await Promise.all([
-      tally("ml_orders"),
-      tally("ml_shipments"),
-      tally("ml_shipment_events"),
-      tally("ml_sync_runs", (q: any) => q.eq("status", "error")),
-      tally("rastreio_consultas"),
-    ]);
+    type Contagem = { orders: number; shipments: number; events: number; errors: number; tracking: number };
+    const porConta = new Map<string, Contagem>();
+    const LOTE = 8;
+    for (let i = 0; i < ids.length; i += LOTE) {
+      const parciais = await Promise.all(
+        ids.slice(i, i + LOTE).map(async (id: string) => {
+          const [orders, shipments, events, errors, tracking] = await Promise.all([
+            contar("ml_orders", id),
+            contar("ml_shipments", id),
+            contar("ml_shipment_events", id),
+            contar("ml_sync_runs", id, (q: any) => q.eq("status", "error")),
+            contar("rastreio_consultas", id),
+          ]);
+          return [id, { orders, shipments, events, errors, tracking }] as const;
+        }),
+      );
+      for (const [id, counts] of parciais) porConta.set(id, counts);
+    }
 
     return accounts.map((a: any) => ({
       ...publicAccount(a),
-      counts: {
-        orders: orders.get(String(a.id)) ?? 0,
-        shipments: shipments.get(String(a.id)) ?? 0,
-        events: events.get(String(a.id)) ?? 0,
-        errors: errors.get(String(a.id)) ?? 0,
-        tracking: tracking.get(String(a.id)) ?? 0,
-      },
+      counts: porConta.get(String(a.id)) ?? { orders: 0, shipments: 0, events: 0, errors: 0, tracking: 0 },
     }));
   });
 
