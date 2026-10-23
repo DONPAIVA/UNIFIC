@@ -131,6 +131,12 @@ function fmtDateTime(value?: string | null) {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("pt-BR");
 }
 
+function fmtDate(value?: string | null) {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-BR");
+}
+
 function fmtMoney(value?: number | null, currency?: string | null) {
   if (value == null) return "—";
   try {
@@ -285,10 +291,10 @@ function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void 
  * assim ele se separa dos dados sem precisar de borda pesada, e continua
  * legível quando a tabela rola na horizontal no celular.
  */
-function Table({ head, children }: { head: string[]; children: React.ReactNode }) {
+function Table({ head, children, fixed = false }: { head: string[]; children: React.ReactNode; fixed?: boolean }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-zinc-200">
-      <table className="w-full text-left text-sm">
+      <table className={`w-full text-left text-sm ${fixed ? "table-fixed" : ""}`}>
         <thead>
           <tr className="border-b-2 border-[#FFE600] bg-[#FFFBE0] text-[11px] uppercase tracking-wide text-[#1F5FD4]">
             {head.map((h) => (
@@ -2083,24 +2089,23 @@ function PedidosTab({ accountId }: { accountId: string | null }) {
       ) : (
         <>
           <Table
-            head={["ID", "Data", "Comprador", "Item", "Qtd", "Valor", "Status", "Tracking", "Ação"]}
+            fixed
+            head={["ID", "Data", "Comprador", "Item", "Valor", "Status", "Ação"]}
           >
             {data.rows.map((o: any) => (
               <tr key={o.id} className="cursor-pointer hover:bg-zinc-50" onClick={() => setOpenId(o.id)}>
-                <td className="px-2 py-2 font-mono text-xs text-[#1F5FD4]">{o.ml_order_id}</td>
-                <td className="px-2 py-2 text-xs">{fmtDateTime(o.date_created)}</td>
-                <td className="px-2 py-2 text-xs">{o.buyer_nickname || "—"}</td>
-                <td className="px-2 py-2 max-w-[280px] truncate text-xs">{o.title || "—"}</td>
-                <td className="px-2 py-2 tabular-nums">{o.quantity ?? "—"}</td>
-                <td className="px-2 py-2 whitespace-nowrap tabular-nums">{fmtMoney(o.total_amount, o.currency_id)}</td>
-                <td className="px-2 py-2 text-xs">{o.status || "—"}</td>
-                <td className="px-2 py-2 font-mono text-[11px]">{o.tracking_code || "—"}</td>
+                <td className="truncate px-2 py-2 font-mono text-xs text-[#1F5FD4]">{o.ml_order_id}</td>
+                <td className="truncate px-2 py-2 text-xs">{fmtDate(o.date_created)}</td>
+                <td className="truncate px-2 py-2 text-xs">{o.buyer_nickname || "—"}</td>
+                <td className="truncate px-2 py-2 text-xs" title={o.title || ""}>{o.title || "—"}</td>
+                <td className="whitespace-nowrap px-2 py-2 text-xs tabular-nums">{fmtMoney(o.total_amount, o.currency_id)}</td>
+                <td className="truncate px-2 py-2 text-xs">{o.status || "—"}</td>
                 <td className="px-2 py-2">
                   {/* A ação de recebimento fica no detalhe (exige confirmação:
                       o feedback do Mercado Livre é único e irreversível). */}
                   {o.canMarkReceived ? (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white">
-                      <CheckCircle2 className="h-3 w-3" /> Marcar recebido
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white">
+                      <CheckCircle2 className="h-3 w-3" /> Receber
                     </span>
                   ) : o.buyer_feedback_at ? (
                     <span className="text-[11px] text-zinc-700">recebido</span>
