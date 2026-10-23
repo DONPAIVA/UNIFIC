@@ -288,7 +288,7 @@ function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void 
 function Table({ head, children }: { head: string[]; children: React.ReactNode }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-zinc-200">
-      <table className="w-full min-w-[720px] text-left text-sm">
+      <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b-2 border-[#FFE600] bg-[#FFFBE0] text-[11px] uppercase tracking-wide text-[#1F5FD4]">
             {head.map((h) => (
@@ -2083,7 +2083,7 @@ function PedidosTab({ accountId }: { accountId: string | null }) {
       ) : (
         <>
           <Table
-            head={["ID", "Data", "Comprador", "Item", "Qtd", "Valor", "Status", "Envio", "Tracking", "Atualizado", "Ação"]}
+            head={["ID", "Data", "Comprador", "Item", "Qtd", "Valor", "Status", "Tracking", "Ação"]}
           >
             {data.rows.map((o: any) => (
               <tr key={o.id} className="cursor-pointer hover:bg-zinc-50" onClick={() => setOpenId(o.id)}>
@@ -2094,9 +2094,7 @@ function PedidosTab({ accountId }: { accountId: string | null }) {
                 <td className="px-2 py-2 tabular-nums">{o.quantity ?? "—"}</td>
                 <td className="px-2 py-2 whitespace-nowrap tabular-nums">{fmtMoney(o.total_amount, o.currency_id)}</td>
                 <td className="px-2 py-2 text-xs">{o.status || "—"}</td>
-                <td className="px-2 py-2 font-mono text-[11px]">{o.shipping_id || "—"}</td>
                 <td className="px-2 py-2 font-mono text-[11px]">{o.tracking_code || "—"}</td>
-                <td className="px-2 py-2 text-xs">{fmtDateTime(o.last_updated)}</td>
                 <td className="px-2 py-2">
                   {/* A ação de recebimento fica no detalhe (exige confirmação:
                       o feedback do Mercado Livre é único e irreversível). */}
